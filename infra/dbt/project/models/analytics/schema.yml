@@ -1,0 +1,29 @@
+version: 2
+models:
+  - name: orders_eur
+    description: >-
+      One row per original order, with UTC-date reference valuation in EUR.
+      Requires a verified request for that date; latest eligible publication wins.
+      Maximum rate age is seven calendar days. This is a daily reference valuation,
+      not an exchange rate known at the intraday order timestamp.
+    data_tests:
+      - unique_business_key:
+          arguments:
+            columns: [dataset_id, order_id]
+    columns:
+      - name: dataset_id
+        data_tests: [not_null]
+      - name: order_id
+        data_tests: [not_null]
+      - name: order_date
+        data_tests: [not_null]
+      - name: conversion_status
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [identity, converted, missing_rate, stale_rate, unsupported_currency]
+      - name: eur_total_minor
+        description: EUR cents, rounded HALF_UP once per whole order; null without usable FX.
+      - name: total_eur
+        description: Fixed DECIMAL(24,2) EUR amount; never a floating-point display conversion.

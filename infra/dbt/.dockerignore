@@ -1,0 +1,12 @@
+*
+!Dockerfile
+!.dockerignore
+!requirements.txt
+!run.py
+!project/
+!project/**
+project/target/
+project/logs/
+project/dbt_packages/
+**/.env
+**/.env.*

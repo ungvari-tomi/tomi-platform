@@ -1,0 +1,8 @@
+# Linux CPython 3.12 wheel hashes from the project's uv.lock; x86_64 and aarch64.
+duckdb==2.0.0 \
+    --hash=sha256:e38daf0acbad9de7ce892d402b68409519291ee16af3c2cba85ace3b085c7eaa \
+    --hash=sha256:ab51ec57d329d6f3df37c0287b55d71c3fc07bb54b61d1afed09104f953b1431
+filelock==4.2.5 \
+    --hash=sha256:46ce42d27e5cdde09ee7197349663e97cb106679bd9e75db3a09679fbc7aa1a8
+pytz==2026.6 \
+    --hash=sha256:7fed3fee8fd6bd4a2b7b75a8d56021d0624127bf69bd5691f115db929ac570b3

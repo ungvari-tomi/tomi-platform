@@ -218,3 +218,32 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# RetailFlow local runtimes and generated data
+.bootstrap/
+.python-runtime/
+.uv-cache/
+data/
+artifacts/
+pytest-cache-files-*/
+*.duckdb
+*.duckdb.wal
+.env.*
+!.env.example
+
+# Terraform local state and plans can contain credentials; commit only the provider lockfile.
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfstate.lock.info
+*.tfplan
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+crash.log
+crash.*.log
+**/*.local.tf
+infra/local/migration-summary.json
+infra/dbt/project/target/
+infra/dbt/project/logs/
+infra/dbt/project/dbt_packages/

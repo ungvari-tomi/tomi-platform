@@ -1,0 +1,4 @@
+# Same DuckDB version and Linux wheel hashes as the warehouse runtime.
+duckdb==2.0.0 \
+    --hash=sha256:e38daf0acbad9de7ce892d402b68409519291ee16af3c2cba85ace3b085c7eaa \
+    --hash=sha256:ab51ec57d329d6f3df37c0287b55d71c3fc07bb54b61d1afed09104f953b1431

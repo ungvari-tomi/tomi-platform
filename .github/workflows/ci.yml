@@ -1,0 +1,127 @@
+name: CI
+
+"on":
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Checks (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2025]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: "0.13.6"
+          python-version: "3.12.16"
+          enable-cache: false
+      - run: uv sync --locked
+      - name: Lint
+        run: uv run --locked ruff check retailflow dags infra scripts tests
+      - name: Format
+        run: uv run --locked ruff format --check retailflow dags infra scripts tests
+      - name: Secret and operational-file gate
+        run: uv run --locked python -m scripts.ci_safety
+      - name: Python security checks
+        run: uv run --locked bandit -r retailflow dags infra/duckdb infra/dbt/run.py infra/orchestration/start.py scripts/export_warehouse.py scripts/ci_safety.py scripts/release_bundle.py -q
+      - name: Tests
+        run: uv run --locked pytest -q -p no:cacheprovider --junitxml=artifacts/unit-tests.xml
+
+  infrastructure:
+    name: Infrastructure and dependency checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: "0.13.6"
+          python-version: "3.12.16"
+          enable-cache: false
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: "1.17.1"
+          terraform_wrapper: false
+      - run: uv sync --locked
+      - run: terraform -chdir=infra/local fmt -check
+      - name: Validate workflow syntax
+        shell: bash
+        run: |
+          curl --fail --silent --show-error --location https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz --output "$RUNNER_TEMP/actionlint.tar.gz"
+          echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  $RUNNER_TEMP/actionlint.tar.gz" | sha256sum --check
+          tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP" actionlint
+          "$RUNNER_TEMP/actionlint" -shellcheck= .github/workflows/ci.yml .github/workflows/delivery.yml
+      - run: terraform -chdir=infra/local init -backend=false -input=false -lockfile=readonly
+      - run: terraform -chdir=infra/local validate
+      - name: Audit locked runtime dependencies
+        shell: bash
+        run: |
+          uv export --locked --no-dev --no-emit-project --format requirements-txt --output-file "$RUNNER_TEMP/root-requirements.txt" --quiet
+          uv export --project infra/dbt --locked --no-dev --no-emit-project --format requirements-txt --output-file "$RUNNER_TEMP/dbt-requirements.txt" --quiet
+          uv run --locked pip-audit --disable-pip --require-hashes -r "$RUNNER_TEMP/root-requirements.txt"
+          uv run --locked pip-audit --disable-pip --require-hashes -r "$RUNNER_TEMP/dbt-requirements.txt"
+
+  integration:
+    name: Docker and data pipeline
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      RETAILFLOW_TEST_AZURITE: "1"
+      RETAILFLOW_TEST_DUCKDB_IMAGE: "1"
+      RETAILFLOW_TEST_AIRFLOW_IMAGE: "1"
+      RETAILFLOW_TEST_DBT_IMAGE: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: "0.13.6"
+          python-version: "3.12.16"
+          enable-cache: false
+      - run: uv sync --locked
+      - name: Require PowerShell for developer-command tests
+        shell: pwsh
+        run: $PSVersionTable.PSVersion
+      - name: Start disposable local blob emulator
+        shell: bash
+        run: |
+          key="$(python -c 'import base64,secrets; print(base64.b64encode(secrets.token_bytes(32)).decode())')"
+          echo "::add-mask::$key"
+          echo "AZURITE_ACCOUNT_KEY=$key" >> "$GITHUB_ENV"
+          docker run --detach --name retailflow-ci-azurite --publish 127.0.0.1:10000:10000 --env "AZURITE_ACCOUNTS=retailflow:$key" mcr.microsoft.com/azure-storage/azurite:3.37.0 azurite-blob --blobHost 0.0.0.0 --location /data --disableTelemetry
+      - name: Build validation images
+        run: |
+          docker build --provenance=false --tag retailflow-duckdb:validation infra/duckdb
+          docker build --provenance=false --tag retailflow-dbt:validation infra/dbt
+          docker build --provenance=false --file infra/orchestration/api.Dockerfile --tag retailflow-orders-api:validation .
+          docker build --provenance=false --file infra/orchestration/airflow.Dockerfile --tag retailflow-airflow:validation .
+      - name: Full tests using disposable data
+        run: uv run --locked pytest -q -p no:cacheprovider --junitxml=artifacts/integration-tests.xml
+      - name: Retain test summary only
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: integration-test-summary
+          path: artifacts/integration-tests.xml
+          if-no-files-found: ignore
+          retention-days: 1

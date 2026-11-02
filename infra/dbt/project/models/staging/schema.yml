@@ -1,0 +1,85 @@
+version: 2
+
+models:
+  - name: stg_orders
+    description: >-
+      One synthetic order per dataset_id and order_id. Timestamp instants are
+      timezone aware. Prices remain integer minor units in the original currency;
+      they must not be summed across currencies. Python owns the raw source.
+    data_tests:
+      - unique_business_key:
+          arguments:
+            columns: [dataset_id, order_id]
+    columns:
+      - name: dataset_id
+        description: Identity of the generator version, seed, and interval.
+        data_tests: [not_null]
+      - name: order_id
+        description: Order identifier within a generator dataset, not globally unique.
+        data_tests: [not_null, positive]
+      - name: ordered_at
+        description: Original order timestamp instant, stored as TIMESTAMPTZ.
+        data_tests: [not_null]
+      - name: country_code
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['HU', 'DE', 'FR', 'PL', 'CZ', 'RO', 'GB', 'CH', 'SE', 'NO', 'DK']
+      - name: currency_code
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [EUR, HUF, PLN, CZK, RON, GBP, CHF, SEK, NOK, DKK]
+      - name: product_id
+        data_tests: [not_null]
+      - name: quantity
+        data_tests: [not_null, positive]
+      - name: unit_price_minor
+        description: Positive unit price in original currency minor units.
+        data_tests: [not_null, positive]
+      - name: total_minor
+        description: Quantity multiplied by unit_price_minor, in original currency.
+        data_tests: [not_null, positive]
+      - name: source_manifest_path
+        description: First landed batch that introduced the canonical order.
+        data_tests: [not_null]
+
+  - name: stg_exchange_rates
+    description: >-
+      One published ECB EUR/HUF reference rate per provider, base, quote, and rate
+      date. Publication date can precede the requested date on non-business days.
+      Exact decimal values are preserved. This model does not convert order amounts.
+    data_tests:
+      - unique_business_key:
+          arguments:
+            columns: [rate_provider, base_currency_code, quote_currency_code, rate_date]
+    columns:
+      - name: rate_provider
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [ECB]
+      - name: base_currency_code
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [EUR]
+      - name: quote_currency_code
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [HUF, PLN, CZK, RON, GBP, CHF, SEK, NOK, DKK]
+      - name: rate_date
+        description: Publication date, not the API request date.
+        data_tests: [not_null]
+      - name: quote_units_per_base_unit
+        description: HUF units per one EUR, DECIMAL(24,12); divide HUF by this rate for EUR.
+        data_tests: [not_null, positive]
+      - name: source_manifest_path
+        description: First landed batch that introduced the canonical rate.
+        data_tests: [not_null]

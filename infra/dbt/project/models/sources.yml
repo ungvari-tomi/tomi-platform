@@ -1,0 +1,13 @@
+version: 2
+sources:
+  - name: retailflow_raw
+    schema: raw
+    description: Checksum-verified source batches loaded by Python; synthetic orders and public ECB rates.
+    tables:
+      - name: orders
+      - name: exchange_rates
+  - name: retailflow_ops
+    schema: ops
+    description: Verified date-specific FX request lineage maintained by the transactional loader.
+    tables:
+      - name: fx_batch_records

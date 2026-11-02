@@ -1,0 +1,38 @@
+[project]
+name = "retailflow"
+version = "0.1.0"
+description = "Local-first retail data platform with a synthetic source API"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "azure-storage-blob",
+    "duckdb",
+    "fastapi",
+    "filelock",
+    "httpx",
+    "pydantic",
+    "pytz",
+    "python-dotenv",
+    "uvicorn",
+]
+
+[dependency-groups]
+dev = [
+    "bandit",
+    "detect-secrets",
+    "pip-audit",
+    "pytest",
+    "ruff",
+]
+
+[tool.uv]
+package = false
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

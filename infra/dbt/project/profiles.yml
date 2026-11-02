@@ -1,0 +1,14 @@
+retailflow:
+  target: local
+  outputs:
+    local:
+      type: duckdb
+      path: "{{ env_var('RETAILFLOW_DUCKDB_PATH') }}"
+      schema: staging
+      threads: 1
+      settings:
+        memory_limit: 256MB
+        threads: 1
+        enable_external_access: false
+        autoinstall_known_extensions: false
+        autoload_known_extensions: false
