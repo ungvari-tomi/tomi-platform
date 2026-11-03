@@ -4,7 +4,11 @@ Status: workflows and local safety helpers are published on GitHub. The first ru
 passed infrastructure/dependency checks but failed test collection because the
 pytest executable did not include the source checkout on Python's import path.
 Both test jobs now invoke `python -m pytest`, matching local validation; the
-corrected hosted run remains to be verified. The repository is public
+next hosted run reached 141 passing tests and exposed a PostgreSQL readiness race
+in the disposable integration test. Its probe now requires TCP port 5432 rather
+than accepting the image's temporary socket-only initialization server. This
+regression check passed locally against a fresh database; the corrected hosted
+run remains to be verified. The repository is public
 and the owner has admin/push access. There is one maintainer: the owner's approval
 is sufficient. No second reviewer, required approval from another account, protected
 environment reviewer, or prevent-self-review setting is introduced.
@@ -127,8 +131,10 @@ Local verification completed on 2026-11-02:
   dirty-checkout rejection and refusal to overwrite an existing delivery.
 
 The first GitHub run passed infrastructure/dependency checks. Its Windows, Ubuntu
-and integration jobs failed during test collection; the invocation correction is
-described above. Local package behavior was tested with disposable fixtures; a
+and integration jobs failed during test collection; the invocation correction and
+subsequent disposable PostgreSQL readiness fix are described above. On 2026-11-03,
+the targeted PostgreSQL bootstrap test passed, as did Ruff lint/format checks.
+Local package behavior was tested with disposable fixtures; a
 hosted delivery has not been requested. No live deployment changed. Recommended
 next milestone: verify the corrected hosted run, then prepare the first
 owner-approved delivery.

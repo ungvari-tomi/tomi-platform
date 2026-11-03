@@ -172,17 +172,31 @@ def test_airflow_initializes_real_postgres_without_managed_resources() -> None:
             "POSTGRES_PASSWORD",
             postgres_image,
         )
-        for _ in range(80):
+        # The image's temporary initialization server accepts Unix-socket connections
+        # before the final server listens on TCP. Airflow requires the latter.
+        deadline = time.monotonic() + 60
+        while time.monotonic() < deadline:
             if (
                 docker(
-                    "exec", name, "pg_isready", "-U", "postgres", "-d", "airflow", check=False
+                    "exec",
+                    name,
+                    "pg_isready",
+                    "-h",
+                    "127.0.0.1",
+                    "-p",
+                    "5432",
+                    "-U",
+                    "postgres",
+                    "-d",
+                    "airflow",
+                    check=False,
                 ).returncode
                 == 0
             ):
                 break
             time.sleep(0.25)
         else:
-            raise AssertionError("Disposable PostgreSQL did not become ready")
+            raise AssertionError("Disposable PostgreSQL did not become ready on TCP port 5432")
         result = docker(
             "run",
             "--rm",
