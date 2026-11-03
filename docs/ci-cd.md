@@ -19,14 +19,18 @@ uv 0.13.6 and Terraform 1.17.1. Cache uploads are disabled. Repeated runs for th
 same workflow/ref cancel superseded work. There are no workstation credentials,
 cloud credentials, registry credentials or live Terraform state in CI.
 
-- Windows and Ubuntu check Ruff lint/format, Bandit, source secret/operational-file
-  safety and the normal test suite. Optional Docker tests are skipped in these jobs.
+- An always-on Ubuntu job checks source secrets/operational files and selects
+  coverage from Git diffs, including deleted/renamed paths. It fetches history
+  without persisting credentials and fails open to full coverage on missing diffs.
+- Selected Windows and Ubuntu jobs check Ruff lint/format, Bandit and relevant
+  tests. Optional Docker tests are skipped in these jobs.
 - Ubuntu validates GitHub workflow syntax with checksum-pinned actionlint 1.7.12,
   Terraform formatting/schema using backend-disabled init and the readonly provider
-  lock, then audits both locked runtime dependency exports with pip-audit. No plan
+  lock, then audits both locked runtime dependency exports with pip-audit. These
+  steps run only when their selected scope requires them. No plan
   or apply is run against the Windows Docker configuration.
 - Ubuntu builds the four validation images, generates a masked emulator-only key,
-  starts disposable Azurite bound to loopback, and runs the full opt-in suite. The
+  starts disposable Azurite bound to loopback, and runs selected opt-in tests. The
   tests use UUID-named temporary containers/volumes, mocked external FX responses,
   and synthetic data. They do not connect to the laptop or a cloud storage account.
   Ubuntu's PowerShell (pwsh) executes developer-command tests. The development
@@ -40,6 +44,30 @@ provider lock remain allowed configuration examples. Reports contain file/line/t
 never secret values. Narrow inline allowlists cover documented public identifiers
 and mount paths; there is no broad baseline accepting new findings. This is a
 heuristic scanner, not proof that every possible secret is detected.
+
+### Relevant tests after a change
+
+`scripts/ci_select.py` applies this conservative policy to pushes and pull requests:
+
+| Change | Coverage |
+| --- | --- |
+| README, AGENTS or docs only | Always-on source safety gate; skip runtime tests |
+| Local infrastructure helper | Infrastructure/release-review unit tests and Terraform checks |
+| Release/package helpers | Related unit tests; skip image builds |
+| Local Terraform files | Infrastructure unit tests, fmt/schema and real image-hash boundary test |
+| Test file only | That test module; enable Docker when its opt-in markers require it |
+| Shared runtime, build inputs, locks, workflows, fixtures or unknown paths | Full coverage |
+| Manual CI or reusable delivery | Full coverage regardless of paths |
+
+The test runner accepts only explicit test-module paths or the whole tests directory,
+never shell fragments/options from Git filenames. CI always prints its selection.
+The source safety gate remains unconditional. Delivery explicitly requests full
+validation through the reusable workflow input; this cannot inherit a docs-only
+skip. Local work follows the same principle: run affected tests first and broaden
+only for new failures, shared effects or uncertainty.
+
+This selection milestone is locally tested and included in the owner-approved
+source update; its hosted validation result remains to be verified.
 
 ## Continuous delivery and your approval
 

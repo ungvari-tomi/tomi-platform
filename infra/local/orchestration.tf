@@ -51,6 +51,11 @@ locals {
   application_hash = sha256(join("", [
     for name in sort(tolist(fileset("${path.module}/../../retailflow", "*.py"))) :
     filesha256("${path.module}/../../retailflow/${name}")
+    if name != "infrastructure.py"
+  ]))
+  api_application_hash = sha256(join("", [
+    for name in ["__init__.py", "api.py", "currencies.py"] :
+    filesha256("${path.module}/../../retailflow/${name}")
   ]))
   airflow_env = [
     "AIRFLOW__CORE__EXECUTOR=LocalExecutor",
@@ -82,7 +87,7 @@ resource "docker_image" "orders_api" {
     dockerfile = "infra/orchestration/api.Dockerfile"
   }
   triggers = {
-    application  = local.application_hash
+    application  = local.api_application_hash
     dockerfile   = filesha256("${path.module}/../orchestration/api.Dockerfile")
     requirements = filesha256("${path.module}/../orchestration/api-requirements.txt")
     dockerignore = filesha256("${path.module}/../../.dockerignore")

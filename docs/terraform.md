@@ -137,3 +137,25 @@ for the helper's fixed CLI argument-list execution without a shell. The approved
 apply completed, all seven original backup blobs matched afterward, and a new
 blob upload/download check passed. The follow-up plan reported no imports,
 creates, updates, replacements, or deletes.
+
+## Application image inputs
+
+The orders API copies and hashes only `retailflow/__init__.py`, `api.py` and
+`currencies.py`. Airflow copies/hashes runtime Python modules with the local
+`infrastructure.py` helper excluded by both Docker ignore rules and Terraform.
+Dockerfiles, requirements, DAGs, dbt files and other existing image-specific
+triggers remain independently tracked. Future imports must update the API copy
+list and hash inputs together. Unknown Airflow module additions remain included.
+
+The narrower hashes and Docker context require one migration rebuild of the two
+application images. A saved local plan proposes those images and five dependent
+containers, with no volume/network replacement. This plan was reviewed but not
+applied. Afterwards, helper-only changes no longer invalidate either application
+hash; warehouse changes affect Airflow only, while currency changes affect both.
+`tests/test_image_inputs.py` evaluates the actual Terraform expressions in a
+provider-free disposable tree to verify those boundaries.
+
+Focused validation for this milestone: CI-selection/infrastructure/hash tests,
+two rebuilt-image smoke tests, workflow lint, Terraform fmt/schema and a saved
+local plan. Its blob backup verified 810 objects. No full-suite rerun or live
+deployment was performed for this change.

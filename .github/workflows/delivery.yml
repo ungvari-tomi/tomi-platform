@@ -10,6 +10,8 @@ jobs:
   verify:
     if: github.ref == 'refs/heads/main'
     uses: ./.github/workflows/ci.yml
+    with:
+      full_validation: true
   package:
     name: Package validated commit
     needs: verify

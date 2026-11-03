@@ -79,6 +79,13 @@
   structured logs without sensitive values, and readable parameterized SQL.
 - Use Python 3.12 and the committed uv lockfile. Run Ruff, relevant automated tests,
   and security checks; report only checks actually executed and their results.
+- Choose tests by changed behavior and dependencies; broaden for failures, shared
+  runtime changes or unknown impact. Do not rerun the full suite for routine local
+  edits. CI uses scripts/ci_select.py for path-based jobs/tests; missing diffs and
+  unknown paths select full coverage. Manual CI and delivery always validate fully.
+  Keep the source safety gate on every run. API image inputs are its package init,
+  api.py and currencies.py; Airflow includes runtime modules but excludes the local
+  infrastructure helper. Keep Docker copy rules and Terraform hashes aligned.
 - Test new behavior, bug regressions, contracts, and meaningful integration boundaries.
 - Never hardcode or commit credentials. Apply least privilege, safe configuration,
   dependency/container scanning where applicable, and test security enforcement.

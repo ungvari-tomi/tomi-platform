@@ -4,6 +4,6 @@ WORKDIR /app
 COPY infra/orchestration/api-requirements.txt /app/requirements.txt
 RUN python -m pip install --no-cache-dir --require-hashes -r requirements.txt \
     && groupadd --gid 10001 api && useradd --uid 10001 --gid 10001 --no-create-home api
-COPY retailflow /app/retailflow
+COPY retailflow/__init__.py retailflow/api.py retailflow/currencies.py /app/retailflow/
 USER 10001:10001
 CMD ["python", "-m", "uvicorn", "retailflow.api:app", "--host", "0.0.0.0", "--port", "8000"]

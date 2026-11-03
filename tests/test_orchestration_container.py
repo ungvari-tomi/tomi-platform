@@ -18,6 +18,8 @@ ENABLED = os.environ.get("RETAILFLOW_TEST_AIRFLOW_IMAGE") == "1"
 def test_airflow_sdk_constructs_both_dags() -> None:
     script = """
 import runpy
+from pathlib import Path
+assert not Path('/opt/airflow/retailflow/infrastructure.py').exists()
 import psycopg2
 import airflow
 from airflow.configuration import conf
@@ -84,6 +86,9 @@ print('PASS: both DAGs constructed with the real Airflow SDK and PostgreSQL driv
 def test_orders_image_serves_http_as_non_root() -> None:
     script = """
 import os, subprocess, sys, time, httpx
+from pathlib import Path
+assert not Path('/app/retailflow/infrastructure.py').exists()
+assert not Path('/app/retailflow/warehouse.py').exists()
 assert os.getuid() == 10001
 process = subprocess.Popen([sys.executable, '-m', 'uvicorn', 'retailflow.api:app',
                             '--host', '127.0.0.1', '--port', '8000'])

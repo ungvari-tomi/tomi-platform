@@ -2,6 +2,7 @@
 
 [Single-maintainer CI and delivery](docs/ci-cd.md) passed hosted validation and delivery checks.
 The local release-review command combines package verification, blob backup and saved-plan review.
+CI selects relevant jobs/tests by changed paths; delivery runs retain full validation.
 
 [Ten-currency generation and EUR valuation](docs/european-currencies.md) are deployed; the versioned migration and live pipelines are verified.
 

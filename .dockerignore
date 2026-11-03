@@ -1,6 +1,7 @@
 *
 !retailflow/
 !retailflow/*.py
+retailflow/infrastructure.py
 !dags/
 !dags/*.py
 !infra/
