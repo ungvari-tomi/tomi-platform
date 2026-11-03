@@ -174,9 +174,29 @@ def plan_summary(plan: dict) -> dict:
 
 
 def main() -> None:
+    global BACKUP
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("action", choices=["init", "validate", "plan", "apply", "verify"])
+    parser.add_argument("--review-directory", type=Path)
     args = parser.parse_args()
+    plan_path = "migration.tfplan"
+    summary_path = DIRECTORY / "migration-summary.json"
+    if args.review_directory:
+        review = args.review_directory.resolve()
+        if not review.is_relative_to(ROOT / "artifacts") or args.action not in {
+            "plan",
+            "verify",
+            "apply",
+        }:
+            parser.error(
+                "Review directories must be under artifacts and used with plan/verify/apply"
+            )
+        review.mkdir(parents=True, exist_ok=True)
+        BACKUP = review / "blobs"
+        plan_path = str(review / "review.tfplan")
+        summary_path = review / "plan-summary.json"
+        if args.action == "plan" and (Path(plan_path).exists() or BACKUP.exists()):
+            parser.error("Review plan/backup already exists; use a new review directory")
     os.chdir(ROOT)
     if args.action == "init":
         initialize_orchestration()
@@ -229,19 +249,17 @@ def main() -> None:
         # Existing installations get an application-level backup before any apply.
         if "docker_container.azurite" in (DIRECTORY / "imports.local.tf").read_text():
             snapshot()
-        terraform(env, "plan", "-input=false", "-no-color", "-out=migration.tfplan")
-        plan = json.loads(terraform(env, "show", "-json", "migration.tfplan"))
+        terraform(env, "plan", "-input=false", "-no-color", f"-out={plan_path}")
+        plan = json.loads(terraform(env, "show", "-json", plan_path))
         summary = plan_summary(plan)
-        (DIRECTORY / "migration-summary.json").write_text(
-            json.dumps(summary, indent=2), encoding="utf-8"
-        )
+        summary_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
         print(json.dumps(summary, indent=2))
     else:
-        plan = json.loads(terraform(env, "show", "-json", "migration.tfplan"))
+        plan = json.loads(terraform(env, "show", "-json", plan_path))
         print(json.dumps(plan_summary(plan)))
         if (BACKUP / "inventory.json").is_file():
             verify_snapshot()
-        terraform(env, "apply", "-input=false", "-no-color", "migration.tfplan")
+        terraform(env, "apply", "-input=false", "-no-color", plan_path)
         if (BACKUP / "inventory.json").is_file():
             print(json.dumps({"verified_blobs": verify_snapshot()}))
         print("Terraform apply completed. Run plan again to check for remaining drift.")

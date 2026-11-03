@@ -48,6 +48,12 @@
   workflow actions pinned to verified commits and exclude secrets, state, data
   and runtime artifacts from delivery. Never attach public PR jobs to the local
   workstation or give CI the live Docker socket/credentials.
+- Prepare local release reviews with `python -m scripts.release_review --archive
+  <inner-source-zip> --commit <full-sha>` in the existing managed clean checkout.
+  Keep its per-attempt backups, saved plans and reports under ignored artifacts;
+  never apply automatically. Do not run legacy infrastructure commands concurrently.
+  Package verification alone does not attest CI success. Pause/drain affected DAGs
+  and preserve a locked warehouse snapshot before a separately approved changing apply.
 - Staging models preserve raw rows, original minor units, and exact decimal rates.
   Orders are keyed by dataset_id plus order_id; rates by provider/base/quote/date.
   Keep quality checks visible as failing dbt tests rather than silently dropping

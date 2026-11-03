@@ -1,14 +1,11 @@
 # Single-maintainer CI and continuous delivery
 
-Status: workflows and local safety helpers are published on GitHub. The first run
-passed infrastructure/dependency checks but failed test collection because the
-pytest executable did not include the source checkout on Python's import path.
-Both test jobs now invoke `python -m pytest`, matching local validation; the
-next hosted run reached 141 passing tests and exposed a PostgreSQL readiness race
-in the disposable integration test. Its probe now requires TCP port 5432 rather
-than accepting the image's temporary socket-only initialization server. This
-regression check passed locally against a fresh database; the corrected hosted
-run remains to be verified. The repository is public
+Status: hosted CI and the first manual delivery succeeded for commit e1d8533.
+[Delivery run 41597830238](https://github.com/ungvari-tomi/tomi-platform/actions/runs/41597830238)
+passed all verification jobs and produced a source package. Its ZIP checksum and
+all 100 source files were checked against Git. A subsequent local plan showed no
+changes and verified 794 backed-up blobs. Earlier test-import and PostgreSQL
+readiness failures were corrected before this successful delivery. The repository is public
 and the owner has admin/push access. There is one maintainer: the owner's approval
 is sufficient. No second reviewer, required approval from another account, protected
 environment reviewer, or prevent-self-review setting is introduced.
@@ -88,6 +85,53 @@ explicitly configured trusted runner or transport; it is not implied by adding C
 Never run a fresh Terraform apply directly from an extracted package with no local
 state: named container/volume collisions and loss of management continuity can
 result. No new live deployment was performed in this CI/CD milestone.
+
+## Repeatable local release review
+
+The new local command combines source verification, Terraform validation, blob
+backup, saved-plan preparation and backup checksum verification. It never applies
+a plan, extracts source, checks out a commit, pauses schedules or changes running
+containers. Use the **inner source ZIP** beside its `.sha256` file, after downloading
+the GitHub artifact. Run from the existing managed checkout with its state and .env.
+
+```powershell
+$releaseCommit = git rev-parse HEAD # Confirm it matches the successful delivery run.
+$releaseArchive = "artifacts/delivery-41597830238/retailflow-$releaseCommit.zip"
+.\.venv\Scripts\python.exe -m scripts.release_review `
+  --archive $releaseArchive --commit $releaseCommit
+```
+
+The example commit must match the checkout's HEAD. Full review requires a clean
+committed worktree, including untracked source; ignored local runtime files remain
+in place. Use `--verify-only` to check package bytes against HEAD without requiring
+a clean worktree or accessing Docker/Terraform. SHA checks identify content; this
+command does not independently authenticate GitHub CI results. Review the successful
+delivery run for the same commit before invoking it.
+
+Each attempt gets a unique ignored `artifacts/release-reviews/<id>/` directory with
+`blobs/`, `review.tfplan`, `plan-summary.json` and a final `review.json`. Plan/state
+contents remain private; only safe summaries and hashes belong in review reports.
+The Terraform helper's `--review-directory` keeps these backups and plans separate
+from previous attempts and the legacy migration plan. Partial attempts are retained,
+with no successful review marker. Nothing is automatically deleted. Keep these local
+files protected: saved plans contain secrets and blob backups contain synthetic data.
+
+The command serializes its own invocations with a local FileLock. Do not concurrently
+run legacy infrastructure commands or edit the checkout. It rechecks HEAD/worktree
+after planning, but the saved plan and live data must still be reviewed immediately
+before a separately approved apply. Snapshot the warehouse under its common lock
+and pause/drain affected DAGs before any changing deployment; this review command
+backs up blobs only. A no-change plan needs no apply.
+
+This command is included in the owner-approved release-review source milestone.
+Package checks have been exercised against the real e1d8533 delivery. The combined
+planning path is tested with disposable fixtures; using the new command end to end
+requires a clean committed checkout and a matching delivered package.
+Local validation on 2026-11-03: 143 tests passed and 15 opt-in Docker tests were
+skipped. Ruff lint/format, Bandit and the 102-file source safety scan passed. Tests
+cover package tampering, unexpected entries, wrong commits, dirty checkouts,
+separate attempts, failed plan/backup stages, private-output suppression and
+preservation of the legacy saved plan. No live apply or new hosted run was performed.
 
 ## Activation and costs
 

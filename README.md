@@ -1,6 +1,7 @@
 # RetailFlow
 
-[Single-maintainer CI and delivery](docs/ci-cd.md) are published on GitHub; hosted validation is being verified.
+[Single-maintainer CI and delivery](docs/ci-cd.md) passed hosted validation and delivery checks.
+The local release-review command combines package verification, blob backup and saved-plan review.
 
 [Ten-currency generation and EUR valuation](docs/european-currencies.md) are deployed; the versioned migration and live pipelines are verified.
 

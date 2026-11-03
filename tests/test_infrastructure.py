@@ -1,3 +1,5 @@
+import json
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -107,3 +109,57 @@ def test_backup_verification_detects_source_changes(
     blobs["fx/data.json"] = b"changed"
     with pytest.raises(ValueError, match="verification failed"):
         infrastructure.verify_snapshot()
+
+
+def test_isolated_review_plan_preserves_legacy_plan(monkeypatch, tmp_path):
+    directory = tmp_path / "infra/local"
+    directory.mkdir(parents=True)
+    legacy = directory / "migration.tfplan"
+    legacy.write_bytes(b"existing saved plan")
+    review = tmp_path / "artifacts/release-reviews/attempt"
+    monkeypatch.setattr(infrastructure, "ROOT", tmp_path)
+    monkeypatch.setattr(infrastructure, "DIRECTORY", directory)
+    monkeypatch.setattr(infrastructure, "BACKUP", tmp_path / "legacy-backup")
+    monkeypatch.chdir(tmp_path)
+    for name in (
+        "AZURITE_ACCOUNT_KEY",
+        "AIRFLOW_DB_PASSWORD",
+        "AIRFLOW_POSTGRES_ADMIN_PASSWORD",
+        "RETAILFLOW_AIRFLOW_PASSWORD",
+        "AIRFLOW_FERNET_KEY",
+        "AIRFLOW_JWT_SECRET",
+    ):
+        monkeypatch.setenv(name, "synthetic-value")
+    monkeypatch.setattr(
+        infrastructure,
+        "prepare_imports",
+        lambda env: (directory / "imports.local.tf").write_text("docker_container.azurite"),
+    )
+    backups = []
+    monkeypatch.setattr(infrastructure, "snapshot", lambda: backups.append(infrastructure.BACKUP))
+    calls = []
+
+    def terraform(env, *args):
+        calls.append(args)
+        if args[0] == "plan":
+            Path(args[-1].removeprefix("-out=")).write_bytes(b"new saved plan")
+        return json.dumps({"resource_changes": []}) if args[0] == "show" else ""
+
+    monkeypatch.setattr(infrastructure, "terraform", terraform)
+    monkeypatch.setattr(sys, "argv", ["infrastructure", "plan", "--review-directory", str(review)])
+    infrastructure.main()
+    assert legacy.read_bytes() == b"existing saved plan"
+    assert (review / "review.tfplan").read_bytes() == b"new saved plan"
+    assert backups == [review / "blobs"]
+    assert not any(call[0] == "apply" for call in calls)
+    with pytest.raises(SystemExit):
+        infrastructure.main()
+
+
+def test_review_directory_must_stay_in_ignored_artifacts(monkeypatch, tmp_path):
+    monkeypatch.setattr(infrastructure, "ROOT", tmp_path)
+    monkeypatch.setattr(
+        sys, "argv", ["infrastructure", "plan", "--review-directory", str(tmp_path)]
+    )
+    with pytest.raises(SystemExit):
+        infrastructure.main()
