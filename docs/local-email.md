@@ -1,12 +1,13 @@
 # Local alert inbox
 
-Status: implementation and focused disposable tests passed. The saved local
-Terraform plan is prepared but has not been applied. No managed inbox or scheduled
-email task has been started, and no message has been sent to an external provider.
+Status: deployed locally on 2026-11-03 after owner approval of the saved plan.
+The managed inbox is healthy; a synthetic test message was captured and its body
+verified through the inbox API. The normal monitoring command returned OK/no alerts.
+No scheduled email task has been started or message sent to an external provider.
 
 Mailpit captures SMTP messages and shows them in a browser. Its standard ports
 are documented by the [Mailpit project](https://mailpit.axllent.org/docs/install/docker/).
-After the owner approves and applies the reviewed plan, open:
+The reviewed plan has been applied. Open:
 
 - Inbox: http://127.0.0.1:8025
 - SMTP: 127.0.0.1:1025
@@ -92,7 +93,15 @@ non-root operation, loopback bindings and message persistence after restart.
 Only UUID-named disposable test resources were removed afterward. No live data
 was corrupted, no full-suite rerun was used, and no image vulnerability scan is claimed.
 
-The saved plan adds exactly four Mailpit resources, with no existing resource
-update/replacement/deletion. It backed up and verified 874 source blobs. Apply
-requires owner approval. Next milestone after inbox deployment: a reviewed
-Terraform-managed ten-minute host schedule independent of Airflow.
+The approved saved plan added exactly four Mailpit resources, with no existing
+resource update/replacement/deletion. All 874 original backed-up blobs matched
+after apply. Existing DuckDB, Azurite, PostgreSQL, scheduler and orders API container
+IDs were unchanged. Both published ports were verified as loopback-only, and the
+UI rejected an untrusted Host header. Deployment evidence is retained in ignored
+`artifacts/local-inbox-review-20261103/deployment-checks.json`.
+The final post-apply plan reports no changes and its fresh blob backup verified
+876 objects. Terraform explicitly matches the image's inherited one-second health
+start interval, avoiding repeated drift. No additional apply was needed for that
+declaration. The inbox and ordinary monitor-to-inbox invocation are both healthy.
+Next milestone: a reviewed Terraform-managed ten-minute host schedule independent
+of Airflow.

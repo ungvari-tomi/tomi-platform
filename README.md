@@ -5,8 +5,8 @@ The local release-review command combines package verification, blob backup and 
 CI selects relevant jobs/tests by changed paths; delivery runs retain full validation.
 [Local monitoring](docs/monitoring.md) checks pipeline freshness and failures on demand:
 `python -m scripts.monitor` prints JSON alerts and returns an actionable exit code.
-[Local alert email](docs/local-email.md) is prepared with a Terraform-managed Mailpit inbox;
-its creation awaits approval of the saved plan.
+[Local alert email](docs/local-email.md) uses the Terraform-managed Mailpit inbox at
+http://127.0.0.1:8025; a synthetic email and the normal monitor command were verified.
 
 [Ten-currency generation and EUR valuation](docs/european-currencies.md) are deployed; the versioned migration and live pipelines are verified.
 

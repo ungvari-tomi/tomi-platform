@@ -49,10 +49,11 @@ resource "docker_container" "mailpit" {
     type   = "volume"
   }
   healthcheck {
-    test         = ["CMD", "/mailpit", "readyz"]
-    interval     = "15s"
-    timeout      = "5s"
-    retries      = 3
-    start_period = "10s"
+    test           = ["CMD", "/mailpit", "readyz"]
+    interval       = "15s"
+    timeout        = "5s"
+    retries        = 3
+    start_period   = "10s"
+    start_interval = "1s"
   }
 }

@@ -105,8 +105,8 @@ bytes, existing-writer lock enforcement and refusal to create a missing database
 The real local invocation returned OK with fresh orders, both DAGs enabled/healthy
 and all nine FX currencies present. No live schedules/data were altered to test failures.
 
-The [local Mailpit inbox](local-email.md) and email delivery command are now prepared
-as the next milestone; its saved infrastructure plan awaits approval. This replaces
+The [local Mailpit inbox](local-email.md) and email delivery command are deployed
+and verified locally after the owner-approved saved-plan apply. This replaces
 the proposed Gmail route: no provider signup, mailbox or credentials are required.
 Scheduling this check still requires its own reviewed milestone.
 Recommended next step after publishing this command: choose a local notification
