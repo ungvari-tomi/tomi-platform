@@ -42,6 +42,9 @@ def select(paths: list[str], *, full: bool = False) -> dict:
         elif path in {"scripts/monitor.py", "scripts/monitor_warehouse.py"}:
             flags["checks"] = True
             targets.add("tests/test_monitor.py")
+        elif path == "scripts/monitor_mail.py":
+            flags["checks"] = True
+            targets.add("tests/test_monitor_mail.py")
         elif path.startswith("infra/local/") and path.endswith((".tf", ".hcl")):
             flags["checks"] = flags["terraform"] = True
             targets.add("tests/test_infrastructure.py")
@@ -63,6 +66,7 @@ def select(paths: list[str], *, full: bool = False) -> dict:
                     "RETAILFLOW_TEST_DBT_IMAGE",
                     "RETAILFLOW_TEST_DUCKDB_IMAGE",
                     "RETAILFLOW_TEST_AZURITE",
+                    "RETAILFLOW_TEST_MAILPIT_IMAGE",
                 )
             ):
                 flags["integration"] = True

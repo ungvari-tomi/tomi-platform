@@ -143,6 +143,10 @@ def plan_summary(plan: dict) -> dict:
         "docker_volume.airflow_postgres",
         "docker_volume.airflow_logs",
         "docker_volume.airflow_state",
+        "docker_network.mailpit",
+        "docker_volume.mailpit",
+        "docker_image.mailpit",
+        "docker_container.mailpit",
     }
     for resource in plan.get("resource_changes", []):
         address, change = resource["address"], resource["change"]

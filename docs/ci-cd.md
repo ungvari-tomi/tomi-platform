@@ -29,7 +29,7 @@ cloud credentials, registry credentials or live Terraform state in CI.
   lock, then audits both locked runtime dependency exports with pip-audit. These
   steps run only when their selected scope requires them. No plan
   or apply is run against the Windows Docker configuration.
-- Ubuntu builds the four validation images, generates a masked emulator-only key,
+- Ubuntu builds the five validation images, generates a masked emulator-only key,
   starts disposable Azurite bound to loopback, and runs selected opt-in tests. The
   tests use UUID-named temporary containers/volumes, mocked external FX responses,
   and synthetic data. They do not connect to the laptop or a cloud storage account.
@@ -55,6 +55,7 @@ heuristic scanner, not proof that every possible secret is detected.
 | Local infrastructure helper | Infrastructure/release-review unit tests and Terraform checks |
 | Release/package helpers | Related unit tests; skip image builds |
 | Local monitoring scripts | Monitoring unit/HTTP/locked-database tests; skip image builds |
+| Local email sender | SMTP/deduplication tests; opt-in Mailpit test validates capture/persistence |
 | Local Terraform files | Infrastructure unit tests, fmt/schema and real image-hash boundary test |
 | Test file only | That test module; enable Docker when its opt-in markers require it |
 | Shared runtime, build inputs, locks, workflows, fixtures or unknown paths | Full coverage |

@@ -58,6 +58,8 @@ def test_container_replacement_is_reported_separately_from_data_deletion() -> No
         ("azurerm_storage_account.unexpected", ["create"]),
         ("docker_volume.duckdb", ["delete", "create"]),
         ("docker_volume.duckdb_backups", ["delete", "create"]),
+        ("docker_volume.mailpit", ["delete", "create"]),
+        ("docker_network.mailpit", ["delete", "create"]),
         ("docker_volume.dbt_artifacts", ["delete", "create"]),
         ("docker_volume.duckdb", ["forget"]),
         ("docker_volume.airflow_postgres", ["delete", "create"]),
@@ -83,6 +85,23 @@ def test_duckdb_runtime_resources_are_allowed() -> None:
     )
     assert summary["creates"] == resources
     assert summary["replacements"] == []
+
+
+def test_local_mail_resources_are_allowed_without_loosening_deletion_guards():
+    resources = [
+        "docker_image.mailpit",
+        "docker_network.mailpit",
+        "docker_volume.mailpit",
+        "docker_container.mailpit",
+    ]
+    summary = infrastructure.plan_summary(
+        {
+            "resource_changes": [
+                {"address": address, "change": {"actions": ["create"]}} for address in resources
+            ]
+        }
+    )
+    assert summary["creates"] == resources and not summary["replacements"]
 
 
 def test_backup_verification_detects_source_changes(

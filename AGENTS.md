@@ -95,6 +95,14 @@
   is a warning, never a healthy result. Orders and daily FX have separate freshness
   windows; retain the seven-day FX publication allowance. Do not mutate schedules
   or corrupt live data to test alerts. Keep reports under ignored artifacts/monitoring.
+- Local alert email is captured by Terraform-managed Mailpit: loopback SMTP 1025,
+  UI 8025, dedicated bridge, non-root image and protected persistent volume. Never
+  configure relay/forwarding, external recipients or provider credentials silently.
+  `python -m scripts.monitor_mail` delivers only alert codes/times to the fixed
+  operator@retailflow.test inbox; suppress unchanged alerts for six hours and send
+  recovery only after an emailed incident. Update delivery state only after SMTP
+  acceptance. Inbox auto-deletion is disabled; cleanup requires an explicit owner
+  action. Capture-only SMTP is not internet delivery or a scheduled alert service.
 - Never hardcode or commit credentials. Apply least privilege, safe configuration,
   dependency/container scanning where applicable, and test security enforcement.
 - Document threat models and significant architecture/security decisions.

@@ -137,6 +137,7 @@ jobs:
       RETAILFLOW_TEST_DUCKDB_IMAGE: "1"
       RETAILFLOW_TEST_AIRFLOW_IMAGE: "1"
       RETAILFLOW_TEST_DBT_IMAGE: "1"
+      RETAILFLOW_TEST_MAILPIT_IMAGE: "1"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -161,6 +162,7 @@ jobs:
         run: |
           docker build --provenance=false --tag retailflow-duckdb:validation infra/duckdb
           docker build --provenance=false --tag retailflow-dbt:validation infra/dbt
+          docker build --provenance=false --tag retailflow-mailpit:validation infra/mailpit
           docker build --provenance=false --file infra/orchestration/api.Dockerfile --tag retailflow-orders-api:validation .
           docker build --provenance=false --file infra/orchestration/airflow.Dockerfile --tag retailflow-airflow:validation .
       - name: Selected tests using disposable data

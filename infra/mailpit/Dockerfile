@@ -1,0 +1,8 @@
+FROM axllent/mailpit:v1.33.0@sha256:9b3a463be15354c0f0eba91697d80e3e0d8a5623ef0e627cacc836bc17fd5231
+USER 0
+RUN mkdir -p /data && chown 10001:10001 /data && chmod 0700 /data
+USER 10001:10001
+ENV MP_DATABASE=/data/mailpit.db MP_MAX_MESSAGES=0 MP_DISABLE_VERSION_CHECK=true \
+    MP_SMTP_DISABLE_RDNS=true MP_BLOCK_REMOTE_CSS_AND_FONTS=true \
+    MP_ALLOWED_HOSTS=127.0.0.1,localhost,127.0.0.1:8025,localhost:8025 \
+    MP_SMTP_ALLOWED_RECIPIENTS=^operator@retailflow[.]test$

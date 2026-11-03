@@ -54,6 +54,13 @@ def test_monitor_scripts_select_focused_tests_without_image_builds():
     assert selected["tests"] == ["tests/test_monitor.py"]
 
 
+def test_local_mail_selects_contracts_and_opt_in_container_test():
+    selected = ci_select.select(["scripts/monitor_mail.py"])
+    assert selected["tests"] == ["tests/test_monitor_mail.py"]
+    assert not selected["integration"]
+    assert ci_select.select(["tests/test_monitor_mail.py"])["integration"]
+
+
 def test_deleted_test_triggers_full_coverage():
     assert ci_select.select(["tests/test_removed_contract.py"])["tests"] == ["tests"]
 

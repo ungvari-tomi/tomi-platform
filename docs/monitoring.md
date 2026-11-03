@@ -105,7 +105,10 @@ bytes, existing-writer lock enforcement and refusal to create a missing database
 The real local invocation returned OK with fresh orders, both DAGs enabled/healthy
 and all nine FX currencies present. No live schedules/data were altered to test failures.
 
-Scheduling this check and routing notifications require their own reviewed milestone.
+The [local Mailpit inbox](local-email.md) and email delivery command are now prepared
+as the next milestone; its saved infrastructure plan awaits approval. This replaces
+the proposed Gmail route: no provider signup, mailbox or credentials are required.
+Scheduling this check still requires its own reviewed milestone.
 Recommended next step after publishing this command: choose a local notification
 channel and a Terraform-managed monitoring schedule that does not depend on the
 Airflow service it monitors being healthy.
