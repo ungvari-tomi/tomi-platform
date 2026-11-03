@@ -1,6 +1,6 @@
 # RetailFlow
 
-[Single-maintainer CI and delivery](docs/ci-cd.md) are prepared locally; GitHub activation awaits an approved commit/push.
+[Single-maintainer CI and delivery](docs/ci-cd.md) are published on GitHub; hosted validation is being verified.
 
 [Ten-currency generation and EUR valuation](docs/european-currencies.md) are deployed; the versioned migration and live pipelines are verified.
 

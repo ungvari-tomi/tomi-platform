@@ -42,7 +42,7 @@ jobs:
       - name: Python security checks
         run: uv run --locked bandit -r retailflow dags infra/duckdb infra/dbt/run.py infra/orchestration/start.py scripts/export_warehouse.py scripts/ci_safety.py scripts/release_bundle.py -q
       - name: Tests
-        run: uv run --locked pytest -q -p no:cacheprovider --junitxml=artifacts/unit-tests.xml
+        run: uv run --locked python -m pytest -q -p no:cacheprovider --junitxml=artifacts/unit-tests.xml
 
   infrastructure:
     name: Infrastructure and dependency checks
@@ -116,7 +116,7 @@ jobs:
           docker build --provenance=false --file infra/orchestration/api.Dockerfile --tag retailflow-orders-api:validation .
           docker build --provenance=false --file infra/orchestration/airflow.Dockerfile --tag retailflow-airflow:validation .
       - name: Full tests using disposable data
-        run: uv run --locked pytest -q -p no:cacheprovider --junitxml=artifacts/integration-tests.xml
+        run: uv run --locked python -m pytest -q -p no:cacheprovider --junitxml=artifacts/integration-tests.xml
       - name: Retain test summary only
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

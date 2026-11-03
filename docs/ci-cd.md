@@ -1,7 +1,10 @@
 # Single-maintainer CI and continuous delivery
 
-Status: workflows and local safety helpers are prepared and validated locally.
-They have not been committed/pushed or run on GitHub yet. The repository is public
+Status: workflows and local safety helpers are published on GitHub. The first run
+passed infrastructure/dependency checks but failed test collection because the
+pytest executable did not include the source checkout on Python's import path.
+Both test jobs now invoke `python -m pytest`, matching local validation; the
+corrected hosted run remains to be verified. The repository is public
 and the owner has admin/push access. There is one maintainer: the owner's approval
 is sufficient. No second reviewer, required approval from another account, protected
 environment reviewer, or prevent-self-review setting is introduced.
@@ -84,12 +87,10 @@ result. No new live deployment was performed in this CI/CD milestone.
 
 ## Activation and costs
 
-Most platform implementation files are currently untracked locally. A delivery must
-not silently package only the older README commit. The helper therefore rejects a
-dirty/uncommitted worktree or missing platform source. Activation requires an
-explicitly approved commit/push of the reviewed source and workflows; nothing has
-been published automatically. After publication, inspect the first hosted run and
-correct any runner-specific issue before treating GitHub execution as verified.
+The platform source and workflows are committed and published. The package helper
+rejects a dirty/uncommitted worktree or missing platform source. Subsequent commits
+and pushes still require the owner's approval. Inspect hosted results and correct
+runner-specific issues before treating GitHub execution as verified.
 
 [GitHub's billing documentation](https://docs.github.com/en/billing/concepts/product-billing/github-actions)
 states that standard GitHub-hosted runners are free for public repositories. This
@@ -125,8 +126,9 @@ Local verification completed on 2026-11-02:
 - Package tests verify file checksums, deterministic output, secret exclusions,
   dirty-checkout rejection and refusal to overwrite an existing delivery.
 
-The GitHub-hosted Windows/Ubuntu jobs and dependency-audit steps have not yet run
-on GitHub. A real delivery package requires the approved source commit; local
-package behavior was tested with disposable fixtures. No live deployment changed.
-Recommended next milestone: publish the reviewed platform/workflows, inspect the
-first GitHub run, and prepare the first owner-approved delivery.
+The first GitHub run passed infrastructure/dependency checks. Its Windows, Ubuntu
+and integration jobs failed during test collection; the invocation correction is
+described above. Local package behavior was tested with disposable fixtures; a
+hosted delivery has not been requested. No live deployment changed. Recommended
+next milestone: verify the corrected hosted run, then prepare the first
+owner-approved delivery.
