@@ -39,6 +39,9 @@ def select(paths: list[str], *, full: bool = False) -> dict:
         elif path == "scripts/ci_select.py":
             flags["checks"] = flags["workflows"] = True
             targets.add("tests/test_ci_select.py")
+        elif path in {"scripts/monitor.py", "scripts/monitor_warehouse.py"}:
+            flags["checks"] = True
+            targets.add("tests/test_monitor.py")
         elif path.startswith("infra/local/") and path.endswith((".tf", ".hcl")):
             flags["checks"] = flags["terraform"] = True
             targets.add("tests/test_infrastructure.py")

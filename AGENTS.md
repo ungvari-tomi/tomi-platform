@@ -87,6 +87,14 @@
   api.py and currencies.py; Airflow includes runtime modules but excludes the local
   infrastructure helper. Keep Docker copy rules and Terraform hashes aligned.
 - Test new behavior, bug regressions, contracts, and meaningful integration boundaries.
+- Run local freshness/failure monitoring with `python -m scripts.monitor`. It is
+  on-demand JSON/exit-code reporting, not an external notification or scheduled
+  alert service. Keep endpoints loopback-only, disable redirects/proxy inheritance,
+  and never output authentication values or raw exception messages. The Docker
+  warehouse probe uses read-only SQL under the common FileLock (0660); contention
+  is a warning, never a healthy result. Orders and daily FX have separate freshness
+  windows; retain the seven-day FX publication allowance. Do not mutate schedules
+  or corrupt live data to test alerts. Keep reports under ignored artifacts/monitoring.
 - Never hardcode or commit credentials. Apply least privilege, safe configuration,
   dependency/container scanning where applicable, and test security enforcement.
 - Document threat models and significant architecture/security decisions.

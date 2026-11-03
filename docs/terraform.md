@@ -147,15 +147,32 @@ Dockerfiles, requirements, DAGs, dbt files and other existing image-specific
 triggers remain independently tracked. Future imports must update the API copy
 list and hash inputs together. Unknown Airflow module additions remain included.
 
-The narrower hashes and Docker context require one migration rebuild of the two
-application images. A saved local plan proposes those images and five dependent
-containers, with no volume/network replacement. This plan was reviewed but not
-applied. Afterwards, helper-only changes no longer invalidate either application
+The narrower hashes and Docker context required one migration rebuild of the two
+application images. The owner-approved saved plan replaced those images and five
+dependent containers on 2026-11-03, with no volume/network replacement. Afterwards,
+helper-only changes no longer invalidate either application
 hash; warehouse changes affect Airflow only, while currency changes affect both.
 `tests/test_image_inputs.py` evaluates the actual Terraform expressions in a
 provider-free disposable tree to verify those boundaries.
 
 Focused validation for this milestone: CI-selection/infrastructure/hash tests,
 two rebuilt-image smoke tests, workflow lint, Terraform fmt/schema and a saved
-local plan. Its blob backup verified 810 objects. No full-suite rerun or live
-deployment was performed for this change.
+local plan. Its initial blob backup verified 810 objects. Hosted CI and delivery
+subsequently passed full validation before the approved deployment; no redundant
+local full-suite rerun was performed.
+
+Deployment verification for commit fc998f9: both DAGs were paused and drained,
+840 blobs were backed up/verified, and a locked independent warehouse snapshot
+was preserved. The approved saved plan's checksum was checked before apply.
+Post-apply checks matched every schema and row in all seven warehouse tables
+against that snapshot. Protected DuckDB, Azurite and PostgreSQL container IDs
+remained unchanged; the orders API and Airflow health checks passed.
+
+Controlled run `image_inputs_deployment_20261103T121309Z` succeeded in both source
+DAGs: all six tasks succeeded on attempt 1, and each dbt build completed three
+models and 37 passing tests. Final independent snapshot checks preserved all
+historical raw, membership and ledger records, with orders increasing from 459
+to 462 and canonical FX rows remaining 10. All 840 original blobs still matched.
+The follow-up saved Terraform plan reported no changes; both schedules are enabled.
+Evidence and independent snapshots are retained under ignored
+`artifacts/deployment-fc998f9/`, with the final report in `deployment.json`.

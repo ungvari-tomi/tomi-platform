@@ -48,6 +48,12 @@ def test_terraform_hash_test_requires_real_terraform_job():
     assert selected["terraform"] and not selected["integration"]
 
 
+def test_monitor_scripts_select_focused_tests_without_image_builds():
+    selected = ci_select.select(["scripts/monitor.py", "scripts/monitor_warehouse.py"])
+    assert selected["checks"] and not selected["integration"]
+    assert selected["tests"] == ["tests/test_monitor.py"]
+
+
 def test_deleted_test_triggers_full_coverage():
     assert ci_select.select(["tests/test_removed_contract.py"])["tests"] == ["tests"]
 

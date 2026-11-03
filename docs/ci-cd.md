@@ -54,6 +54,7 @@ heuristic scanner, not proof that every possible secret is detected.
 | README, AGENTS or docs only | Always-on source safety gate; skip runtime tests |
 | Local infrastructure helper | Infrastructure/release-review unit tests and Terraform checks |
 | Release/package helpers | Related unit tests; skip image builds |
+| Local monitoring scripts | Monitoring unit/HTTP/locked-database tests; skip image builds |
 | Local Terraform files | Infrastructure unit tests, fmt/schema and real image-hash boundary test |
 | Test file only | That test module; enable Docker when its opt-in markers require it |
 | Shared runtime, build inputs, locks, workflows, fixtures or unknown paths | Full coverage |
@@ -66,8 +67,10 @@ validation through the reusable workflow input; this cannot inherit a docs-only
 skip. Local work follows the same principle: run affected tests first and broaden
 only for new failures, shared effects or uncertainty.
 
-This selection milestone is locally tested and included in the owner-approved
-source update; its hosted validation result remains to be verified.
+The selection milestone passed hosted CI and
+[delivery validation](https://github.com/ungvari-tomi/tomi-platform/actions/runs/41628948870)
+for fc998f9. Full delivery validation remained enabled. Its reviewed local saved
+plan was subsequently applied with owner approval; see [deployment checks](terraform.md#application-image-inputs).
 
 ## Continuous delivery and your approval
 
@@ -152,9 +155,10 @@ and pause/drain affected DAGs before any changing deployment; this review comman
 backs up blobs only. A no-change plan needs no apply.
 
 This command is included in the owner-approved release-review source milestone.
-Package checks have been exercised against the real e1d8533 delivery. The combined
-planning path is tested with disposable fixtures; using the new command end to end
-requires a clean committed checkout and a matching delivered package.
+Package checks have been exercised against real deliveries, and the combined
+command completed end to end for c46bcae and fc998f9 in the clean managed checkout.
+The fc998f9 review verified 105 source files and 840 backed-up blobs before the
+separately approved apply. A subsequent review reported no Terraform drift.
 Local validation on 2026-11-03: 143 tests passed and 15 opt-in Docker tests were
 skipped. Ruff lint/format, Bandit and the 102-file source safety scan passed. Tests
 cover package tampering, unexpected entries, wrong commits, dirty checkouts,
@@ -202,11 +206,11 @@ Local verification completed on 2026-11-02:
 - Package tests verify file checksums, deterministic output, secret exclusions,
   dirty-checkout rejection and refusal to overwrite an existing delivery.
 
-The first GitHub run passed infrastructure/dependency checks. Its Windows, Ubuntu
-and integration jobs failed during test collection; the invocation correction and
-subsequent disposable PostgreSQL readiness fix are described above. On 2026-11-03,
-the targeted PostgreSQL bootstrap test passed, as did Ruff lint/format checks.
-Local package behavior was tested with disposable fixtures; a
-hosted delivery has not been requested. No live deployment changed. Recommended
-next milestone: verify the corrected hosted run, then prepare the first
-owner-approved delivery.
+Earlier hosted test-import and PostgreSQL readiness failures were corrected and
+verified in successful CI/delivery runs. The owner-approved fc998f9 deployment
+completed with verified backups, preserved historical warehouse records, healthy
+services, six first-attempt successful pipeline tasks, two successful dbt builds
+and no Terraform drift. Both schedules are enabled. No cloud resources were
+provisioned. Deployment evidence is retained in ignored
+`artifacts/deployment-fc998f9/deployment.json`. These documentation updates do not
+change runtime image inputs.
