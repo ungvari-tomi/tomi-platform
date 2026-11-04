@@ -8,9 +8,10 @@ from typing import Annotated, Literal, Self
 
 from dotenv import dotenv_values
 from fastapi import FastAPI, HTTPException, Query, Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from retailflow.currencies import COUNTRY_PROFILES, DATASET_VERSION
+from retailflow.customers import CustomerPage, customer_id_for, generate_customer
 
 EPOCH = datetime(2025, 1, 1, tzinfo=UTC)
 
@@ -59,6 +60,18 @@ class OrderPage(BaseModel):
     orders: list[Order]
     next_after_id: int
     has_more: bool
+
+
+class CustomerOrder(Order):
+    model_config = ConfigDict(extra="forbid")
+    customer_id: str = Field(pattern=r"^customer--?[0-9]+-[A-Z]{2}-[0-9]{4}$", max_length=100)
+    product_id: str = Field(pattern=r"^product-(00[1-9]|01[0-9]|020)$")
+
+
+class CustomerOrderPage(OrderPage):
+    model_config = ConfigDict(extra="forbid")
+    dataset_version: Literal["orders-v4"] = "orders-v4"
+    orders: list[CustomerOrder]
 
 
 def generate_order(order_id: int, settings: Settings) -> Order:
@@ -127,6 +140,61 @@ def create_app(
             orders=records,
             next_after_id=cursor,
             has_more=cursor < latest_id,
+        )
+
+    @service.get("/v2/orders", response_model=CustomerOrderPage)
+    def customer_orders(
+        response: Response,
+        after_id: Annotated[int | None, Query(ge=0)] = None,
+        limit: Annotated[int, Query(ge=1, le=100)] = 20,
+    ) -> CustomerOrderPage:
+        # The customer-enabled contract is separate; v2/v3 source history stays reproducible.
+        base = orders(response, after_id, limit)
+        profile = Settings(
+            seed=settings.seed,
+            interval_seconds=settings.interval_seconds,
+            dataset_version="orders-v3",
+        )
+        linked = []
+        for row in base.orders:
+            original = generate_order(row.order_id, profile)
+            linked.append(
+                CustomerOrder(
+                    **original.model_dump(),
+                    customer_id=customer_id_for(original.order_id, settings.seed, original.country),
+                )
+            )
+        return CustomerOrderPage(
+            **base.model_dump(exclude={"orders", "dataset_version"}), orders=linked
+        )
+
+    @service.get("/v2/customers", response_model=CustomerPage)
+    def customers(
+        response: Response,
+        order_ids: Annotated[list[int], Query(min_length=1, max_length=100)],
+    ) -> CustomerPage:
+        now = clock().astimezone(UTC)
+        latest = int((now - EPOCH).total_seconds()) // settings.interval_seconds + 1
+        if any(index < 1 or index > latest for index in order_ids):
+            raise HTTPException(
+                status_code=422, detail="Order reference is outside the source dataset"
+            )
+        profile = Settings(
+            seed=settings.seed,
+            interval_seconds=settings.interval_seconds,
+            dataset_version="orders-v3",
+        )
+        referenced = {}
+        for index in sorted(set(order_ids)):
+            order = generate_order(index, profile)
+            identifier = customer_id_for(index, settings.seed, order.country)
+            referenced[identifier] = generate_customer(identifier, settings.seed, order.country)
+        response.headers["Cache-Control"] = "no-store"
+        return CustomerPage(
+            seed=settings.seed,
+            interval_seconds=settings.interval_seconds,
+            order_ids=sorted(set(order_ids)),
+            customers=[referenced[key] for key in sorted(referenced)],
         )
 
     return service

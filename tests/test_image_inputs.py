@@ -50,3 +50,7 @@ def test_runtime_hashes_ignore_local_helpers_but_track_runtime_changes(tmp_path)
     currencies = hashes()
     assert currencies["airflow"] != warehouse["airflow"]
     assert currencies["api"] != warehouse["api"]
+    edit("customers.py")
+    customers = hashes()
+    assert customers["airflow"] != currencies["airflow"]
+    assert customers["api"] != currencies["api"]

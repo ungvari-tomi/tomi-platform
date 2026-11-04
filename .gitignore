@@ -220,6 +220,7 @@ __marimo__/
 .streamlit/secrets.toml
 
 # RetailFlow local runtimes and generated data
+[Aa][Gg][Ee][Nn][Tt][Ss].[Mm][Dd]
 .bootstrap/
 .python-runtime/
 .uv-cache/

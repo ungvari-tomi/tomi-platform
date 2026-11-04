@@ -12,6 +12,12 @@ environment reviewer, or prevent-self-review setting is introduced.
 
 ## Continuous integration
 
+`AGENTS.md` files are local instructions: Git ignores them case-insensitively and
+the source-delivery safety check rejects them even if force-added. The existing
+tracked copy has been removed from the index while preserving the local file.
+This does not erase copies in previous commits; history rewriting is a separate
+operation and has not been performed.
+
 `.github/workflows/ci.yml` runs on main pushes, pull requests, and manual dispatch;
 it can also be called by delivery. Jobs use read-only contents permission,
 checkout without persisted credentials, pinned action commits, Python 3.12.16,

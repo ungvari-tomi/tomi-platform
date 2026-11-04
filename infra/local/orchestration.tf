@@ -54,7 +54,7 @@ locals {
     if name != "infrastructure.py"
   ]))
   api_application_hash = sha256(join("", [
-    for name in ["__init__.py", "api.py", "currencies.py"] :
+    for name in ["__init__.py", "api.py", "currencies.py", "customers.py"] :
     filesha256("${path.module}/../../retailflow/${name}")
   ]))
   airflow_env = [

@@ -55,6 +55,7 @@ def source_files(root: Path, *, include_untracked: bool = False) -> list[str]:
                 )
             )
             or path.name == "migration-summary.json"
+            or path.name.lower() == "agents.md"
             or (root / path).is_symlink()
         )
         if forbidden:

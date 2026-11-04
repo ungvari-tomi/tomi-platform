@@ -19,6 +19,8 @@ from scripts import ci_safety, release_bundle
         "data/orders.csv",
         "infra/local/.terraform/provider",
         "warehouse.duckdb.lock",
+        "AGENTS.md",
+        "docs/agents.md",
     ],
 )
 def test_operational_files_are_rejected_without_reading_them(monkeypatch, tmp_path, name):

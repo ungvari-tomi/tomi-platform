@@ -140,8 +140,9 @@ creates, updates, replacements, or deletes.
 
 ## Application image inputs
 
-The orders API copies and hashes only `retailflow/__init__.py`, `api.py` and
-`currencies.py`. Airflow copies/hashes runtime Python modules with the local
+The orders API copies and hashes only `retailflow/__init__.py`, `api.py`,
+`currencies.py` and `customers.py`. The customer-enabled image change is prepared
+locally and requires a separately reviewed deployment. Airflow copies/hashes runtime Python modules with the local
 `infrastructure.py` helper excluded by both Docker ignore rules and Terraform.
 Dockerfiles, requirements, DAGs, dbt files and other existing image-specific
 triggers remain independently tracked. Future imports must update the API copy
