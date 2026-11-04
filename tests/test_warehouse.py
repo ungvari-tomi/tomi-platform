@@ -73,9 +73,9 @@ def test_order_replay_and_overlapping_batches_preserve_lineage(tmp_path: Path) -
     second = orders_batch(store, "overlap")
     assert load_manifest(store, second, database)["rows_inserted"] == 0
     with duckdb.connect(str(database), read_only=True) as connection:
-        assert connection.execute("SELECT count(*) FROM raw.orders").fetchone() == (2,)
-        assert connection.execute("SELECT count(*) FROM ops.loaded_batches").fetchone() == (2,)
-        assert connection.execute("SELECT count(*) FROM ops.order_batch_records").fetchone() == (4,)
+        assert connection.execute("SELECT COUNT(*) FROM raw.orders").fetchone() == (2,)
+        assert connection.execute("SELECT COUNT(*) FROM ops.loaded_batches").fetchone() == (2,)
+        assert connection.execute("SELECT COUNT(*) FROM ops.order_batch_records").fetchone() == (4,)
 
 
 def test_dataset_settings_create_distinct_order_identity(tmp_path: Path) -> None:
@@ -86,7 +86,7 @@ def test_dataset_settings_create_distinct_order_identity(tmp_path: Path) -> None
         == 2
     )
     with duckdb.connect(str(database), read_only=True) as connection:
-        assert connection.execute("SELECT count(*) FROM ops.datasets").fetchone() == (2,)
+        assert connection.execute("SELECT COUNT(*) FROM ops.datasets").fetchone() == (2,)
 
 
 def test_fx_weekend_requests_share_reference_row_and_keep_request_dates(tmp_path: Path) -> None:
@@ -97,9 +97,9 @@ def test_fx_weekend_requests_share_reference_row_and_keep_request_dates(tmp_path
     assert load_manifest(store, second, database)["rows_inserted"] == 0
     assert load_manifest(store, second, database)["already_loaded"]
     with duckdb.connect(str(database), read_only=True) as connection:
-        assert connection.execute("SELECT count(*) FROM raw.exchange_rates").fetchone() == (1,)
+        assert connection.execute("SELECT COUNT(*) FROM raw.exchange_rates").fetchone() == (1,)
         assert connection.execute(
-            "SELECT count(DISTINCT requested_date) FROM ops.fx_batch_records"
+            "SELECT COUNT(DISTINCT requested_date) FROM ops.fx_batch_records"
         ).fetchone() == (2,)
         assert (
             str(connection.execute("SELECT rate FROM raw.exchange_rates").fetchone()[0])
@@ -147,8 +147,8 @@ def test_conflicting_order_rolls_back_entire_batch(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="Conflicting historical"):
         load_manifest(store, conflict, database)
     with duckdb.connect(str(database), read_only=True) as connection:
-        assert connection.execute("SELECT count(*) FROM raw.orders").fetchone() == (2,)
-        assert connection.execute("SELECT count(*) FROM ops.loaded_batches").fetchone() == (1,)
+        assert connection.execute("SELECT COUNT(*) FROM raw.orders").fetchone() == (2,)
+        assert connection.execute("SELECT COUNT(*) FROM ops.loaded_batches").fetchone() == (1,)
 
 
 def test_writer_lock_excludes_other_writers_and_health_probe(tmp_path: Path) -> None:
@@ -202,7 +202,7 @@ def test_revised_rate_is_not_silently_overwritten(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="Conflicting published FX"):
         load_manifest(store, revised, database)
     with duckdb.connect(str(database), read_only=True) as connection:
-        assert connection.execute("SELECT count(*) FROM ops.loaded_batches").fetchone() == (1,)
+        assert connection.execute("SELECT COUNT(*) FROM ops.loaded_batches").fetchone() == (1,)
         assert (
             str(connection.execute("SELECT rate FROM raw.exchange_rates").fetchone()[0])
             == "366.330000000000"

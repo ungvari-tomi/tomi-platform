@@ -43,7 +43,7 @@ def probe_database(path: Path, *, read_only: bool = False) -> dict[str, str]:
     ) as connection:
         if connection.execute("SELECT 1").fetchone() != (1,):
             raise RuntimeError("DuckDB SQL probe failed")
-        version = connection.execute("SELECT version()").fetchone()[0]
+        version = connection.execute("SELECT VERSION()").fetchone()[0]
     return {"status": "ok", "database": str(path), "duckdb_version": version}
 
 
@@ -61,13 +61,13 @@ def report(path: Path) -> dict:
         with duckdb.connect(str(path), read_only=True) as connection:
             counts = {}
             queries = {
-                ("raw", "orders"): "SELECT count(*) FROM raw.orders",
-                ("raw", "exchange_rates"): "SELECT count(*) FROM raw.exchange_rates",
-                ("ops", "loaded_batches"): "SELECT count(*) FROM ops.loaded_batches",
+                ("raw", "orders"): "SELECT COUNT(*) FROM raw.orders",
+                ("raw", "exchange_rates"): "SELECT COUNT(*) FROM raw.exchange_rates",
+                ("ops", "loaded_batches"): "SELECT COUNT(*) FROM ops.loaded_batches",
             }
             for (schema, table), query in queries.items():
                 exists = connection.execute(
-                    """SELECT count(*) FROM information_schema.tables
+                    """SELECT COUNT(*) FROM information_schema.tables
                        WHERE table_schema=? AND table_name=?""",
                     [schema, table],
                 ).fetchone()[0]

@@ -1,14 +1,14 @@
 {% test unique_business_key(model, columns) %}
-select
+SELECT
     {% for column in columns %}{{ adapter.quote(column) }}{% if not loop.last %}, {% endif %}{% endfor %},
-    count(*) as record_count
-from {{ model }}
-group by {% for column in columns %}{{ adapter.quote(column) }}{% if not loop.last %}, {% endif %}{% endfor %}
-having count(*) > 1
+    COUNT(*) AS record_count
+FROM {{ model }}
+GROUP BY {% for column in columns %}{{ adapter.quote(column) }}{% if not loop.last %}, {% endif %}{% endfor %}
+HAVING COUNT(*) > 1
 {% endtest %}
 
 {% test positive(model, column_name) %}
-select *
-from {{ model }}
-where {{ adapter.quote(column_name) }} <= 0
+SELECT *
+FROM {{ model }}
+WHERE {{ adapter.quote(column_name) }} <= 0
 {% endtest %}

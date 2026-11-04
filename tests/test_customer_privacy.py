@@ -141,9 +141,9 @@ def test_loader_idempotence_checksums_and_atomic_conflict(client, key, tmp_path)
     assert load_private(store, manifest, database)["orders"] == 20
     assert load_private(store, manifest, database)["already_loaded"]
     with duckdb.connect(str(database)) as db:
-        assert db.execute("SELECT count(*) FROM privacy_demo.orders").fetchone() == (20,)
+        assert db.execute("SELECT COUNT(*) FROM privacy_demo.orders").fetchone() == (20,)
         assert db.execute(
-            "SELECT count(*) FROM privacy_demo.customers c WHERE NOT EXISTS "
+            "SELECT COUNT(*) FROM privacy_demo.customers c WHERE NOT EXISTS "
             "(SELECT 1 FROM privacy_demo.orders o WHERE o.dataset_id=c.dataset_id "
             "AND o.customer_token=c.customer_token)"
         ).fetchone() == (0,)
@@ -156,8 +156,8 @@ def test_loader_idempotence_checksums_and_atomic_conflict(client, key, tmp_path)
     with pytest.raises(ValueError, match="Conflicting historical"):
         load_private(store, conflicting, database)
     with duckdb.connect(str(database)) as db:
-        assert db.execute("SELECT count(*) FROM privacy_demo.batches").fetchone() == (1,)
-        assert db.execute("SELECT count(*) FROM privacy_demo.order_batches").fetchone() == (20,)
+        assert db.execute("SELECT COUNT(*) FROM privacy_demo.batches").fetchone() == (1,)
+        assert db.execute("SELECT COUNT(*) FROM privacy_demo.order_batches").fetchone() == (20,)
     payload = manifest.removesuffix("metadata.json") + "customers.json"
     original = store.files[payload]
     store.files[payload] += b" "
@@ -193,7 +193,7 @@ def test_loader_obeys_common_warehouse_lock(client, key, tmp_path, monkeypatch):
         with pytest.raises(Timeout):
             load_private(store, manifest, database)
     with duckdb.connect(str(database)) as db:
-        assert db.execute("SELECT count(*) FROM information_schema.tables").fetchone() == (0,)
+        assert db.execute("SELECT COUNT(*) FROM information_schema.tables").fetchone() == (0,)
 
 
 def test_key_environment_priority_and_invalid_key_is_redacted(monkeypatch, tmp_path):

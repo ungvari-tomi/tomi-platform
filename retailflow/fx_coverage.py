@@ -17,10 +17,10 @@ MAX_RATE_AGE_DAYS = 7
 
 COVERAGE_SQL = """
 WITH required AS (
-    SELECT DISTINCT CAST(timezone('UTC', created_at) AS DATE) AS order_date, currency
+    SELECT DISTINCT CAST(TIMEZONE('UTC', created_at) AS DATE) AS order_date, currency
     FROM raw.orders WHERE currency<>'EUR'
 ), candidates AS (
-    SELECT requested_date, quote, max(r.rate_date) AS rate_date
+    SELECT requested_date, quote, MAX(r.rate_date) AS rate_date
     FROM ops.fx_batch_records m
     JOIN raw.exchange_rates r USING(provider, base, quote, rate_date)
     WHERE r.provider='ECB' AND r.base='EUR'

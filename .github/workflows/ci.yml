@@ -73,6 +73,8 @@ jobs:
         run: uv run --locked ruff check retailflow dags infra scripts tests
       - name: Format
         run: uv run --locked ruff format --check retailflow dags infra scripts tests
+      - name: SQL lint
+        run: uv run --locked sqlfluff lint infra/dbt/project
       - name: Python security checks
         run: uv run --locked bandit -r retailflow dags infra/duckdb infra/dbt/run.py infra/orchestration/start.py scripts -q
       - name: Tests

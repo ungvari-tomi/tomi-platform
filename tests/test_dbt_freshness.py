@@ -43,29 +43,29 @@ CREATE OR REPLACE TABLE ops.datasets AS SELECT * FROM (VALUES
  ('active','orders-v3',42,600),('legacy','orders-v2',42,600))
  d(dataset_id,dataset_version,seed,interval_seconds);
 CREATE OR REPLACE TABLE raw.orders AS
- SELECT 'active' AS dataset_id,1 AS order_id,current_timestamp AS created_at
- UNION ALL SELECT 'legacy',1,current_timestamp + interval '2 hours';
+ SELECT 'active' AS dataset_id,1 AS order_id,CURRENT_TIMESTAMP AS created_at
+ UNION ALL SELECT 'legacy',1,CURRENT_TIMESTAMP + INTERVAL '2 hours';
 CREATE OR REPLACE TABLE raw.exchange_rates AS SELECT
- 'ECB' AS provider,'EUR' AS base,quote,current_date - 3 AS rate_date
+ 'ECB' AS provider,'EUR' AS base,quote,CURRENT_DATE - 3 AS rate_date
  FROM (VALUES ('HUF'),('PLN'),('CZK'),('RON'),('GBP'),('CHF'),('SEK'),('NOK'),('DKK')) q(quote);
 CREATE OR REPLACE TABLE ops.loaded_batches AS SELECT quote AS manifest_path,
- 'exchange-rates' AS source,current_timestamp AS loaded_at FROM raw.exchange_rates;
+ 'exchange-rates' AS source,CURRENT_TIMESTAMP AS loaded_at FROM raw.exchange_rates;
 CREATE OR REPLACE TABLE ops.fx_batch_records AS SELECT quote AS manifest_path,
  provider,base,quote,rate_date,rate_date AS requested_date FROM raw.exchange_rates;
 """
 cases=[
  ('healthy','',False),
- ('stale_orders',"UPDATE raw.orders SET created_at=current_timestamp-interval '31 minutes' "
+ ('stale_orders',"UPDATE raw.orders SET created_at=CURRENT_TIMESTAMP-INTERVAL '31 minutes' "
   "WHERE dataset_id='active'",True),
  ('empty_orders',"DELETE FROM raw.orders WHERE dataset_id='active'",True),
  ('stale_fx_ingestion',"UPDATE ops.loaded_batches "
-  "SET loaded_at=current_timestamp-interval '31 hours'",True),
- ('stale_one_pair',"UPDATE ops.loaded_batches SET loaded_at=current_timestamp-interval '31 hours' "
+  "SET loaded_at=CURRENT_TIMESTAMP-INTERVAL '31 hours'",True),
+ ('stale_one_pair',"UPDATE ops.loaded_batches SET loaded_at=CURRENT_TIMESTAMP-INTERVAL '31 hours' "
   "WHERE manifest_path='HUF'",True),
  ('missing_pair',"DELETE FROM raw.exchange_rates WHERE quote='HUF'",True),
- ('old_rate',"UPDATE raw.exchange_rates SET rate_date=current_date-8 WHERE quote='HUF'",True),
- ('future_rate',"UPDATE raw.exchange_rates SET rate_date=current_date+1 WHERE quote='HUF'",True),
- ('future_order',"UPDATE raw.orders SET created_at=current_timestamp+interval '2 minutes' "
+ ('old_rate',"UPDATE raw.exchange_rates SET rate_date=CURRENT_DATE-8 WHERE quote='HUF'",True),
+ ('future_rate',"UPDATE raw.exchange_rates SET rate_date=CURRENT_DATE+1 WHERE quote='HUF'",True),
+ ('future_order',"UPDATE raw.orders SET created_at=CURRENT_TIMESTAMP+INTERVAL '2 minutes' "
   "WHERE dataset_id='active'",True),
 ]
 tables=['raw.orders','raw.exchange_rates','ops.datasets','ops.loaded_batches','ops.fx_batch_records']

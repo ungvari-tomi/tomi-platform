@@ -1,4 +1,4 @@
-select s.dataset_id, s.order_id
-from {{ ref('stg_orders') }} s
-full outer join {{ ref('orders_eur') }} e using (dataset_id, order_id)
-where s.dataset_id is null or e.dataset_id is null
+SELECT s.dataset_id, s.order_id
+FROM {{ ref('stg_orders') }} s
+FULL OUTER JOIN {{ ref('orders_eur') }} e USING (dataset_id, order_id)
+WHERE s.dataset_id IS NULL OR e.dataset_id IS NULL

@@ -173,8 +173,8 @@ def test_real_dbt_checks_and_parses_without_creating_business_models():
             image,
             "-c",
             "import duckdb,json; c=duckdb.connect('/warehouse/retailflow.duckdb'); "
-            'print(json.dumps(c.execute("select table_schema,table_name from '
-            'information_schema.tables order by 1,2").fetchall())); '
+            'print(json.dumps(c.execute("SELECT table_schema,table_name FROM '
+            'information_schema.tables ORDER BY 1,2").fetchall())); '
             "c.execute('DROP TABLE raw.exchange_rates'); c.close()",
         )
         assert json.loads(state.stdout) == [["raw", "exchange_rates"], ["raw", "orders"]]

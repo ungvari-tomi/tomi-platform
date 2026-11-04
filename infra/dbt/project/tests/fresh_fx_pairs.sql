@@ -1,26 +1,26 @@
 {{ config(enabled=var('check_freshness', false), tags=['freshness']) }}
 
-with required(quote) as (
-    values ('HUF'), ('PLN'), ('CZK'), ('RON'), ('GBP'), ('CHF'), ('SEK'), ('NOK'), ('DKK')
-), published as (
-    select quote, max(rate_date) as latest_date
-    from {{ source('retailflow_raw', 'exchange_rates') }}
-    where provider = 'ECB' and base = 'EUR'
-    group by quote
-), loaded as (
-    select m.quote, max(b.loaded_at) as latest_load
-    from {{ source('retailflow_ops', 'fx_batch_records') }} m
-    join {{ source('retailflow_ops', 'loaded_batches') }} b using (manifest_path)
-    where m.provider = 'ECB' and m.base = 'EUR' and b.source = 'exchange-rates'
-    group by m.quote
+WITH required(quote) AS (
+    VALUES ('HUF'), ('PLN'), ('CZK'), ('RON'), ('GBP'), ('CHF'), ('SEK'), ('NOK'), ('DKK')
+), published AS (
+    SELECT quote, MAX(rate_date) AS latest_date
+    FROM {{ source('retailflow_raw', 'exchange_rates') }}
+    WHERE provider = 'ECB' AND base = 'EUR'
+    GROUP BY quote
+), loaded AS (
+    SELECT m.quote, MAX(b.loaded_at) AS latest_load
+    FROM {{ source('retailflow_ops', 'fx_batch_records') }} m
+    JOIN {{ source('retailflow_ops', 'loaded_batches') }} b USING (manifest_path)
+    WHERE m.provider = 'ECB' AND m.base = 'EUR' AND b.source = 'exchange-rates'
+    GROUP BY m.quote
 )
-select q.quote
-from required q
-left join published p using (quote)
-left join loaded l using (quote)
-where p.latest_date is null
-   or p.latest_date > cast(timezone('UTC', current_timestamp) as date)
-   or cast(timezone('UTC', current_timestamp) as date) - p.latest_date > 7
-   or l.latest_load is null
-   or l.latest_load < current_timestamp - interval '30 hours'
-   or l.latest_load > current_timestamp + interval '60 seconds'
+SELECT q.quote
+FROM required q
+LEFT JOIN published p USING (quote)
+LEFT JOIN loaded l USING (quote)
+WHERE p.latest_date IS NULL
+   OR p.latest_date > CAST(TIMEZONE('UTC', CURRENT_TIMESTAMP) AS DATE)
+   OR CAST(TIMEZONE('UTC', CURRENT_TIMESTAMP) AS DATE) - p.latest_date > 7
+   OR l.latest_load IS NULL
+   OR l.latest_load < CURRENT_TIMESTAMP - INTERVAL '30 hours'
+   OR l.latest_load > CURRENT_TIMESTAMP + INTERVAL '60 seconds'

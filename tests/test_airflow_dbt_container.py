@@ -37,12 +37,12 @@ def test_airflow_task_runs_isolated_dbt_and_propagates_quality_failure():
             "p=Path('/warehouse/retailflow.duckdb'); c=duckdb.connect(str(p)); "
             'c.execute("CREATE SCHEMA raw; '
             "CREATE TABLE raw.orders AS SELECT 'dataset' AS dataset_id, "
-            "1::BIGINT AS order_id, current_timestamp AS created_at, "
+            "1::BIGINT AS order_id, CURRENT_TIMESTAMP AS created_at, "
             "'DE' AS country, 'EUR' AS currency, 'product-001' AS product_id, "
             "1::INTEGER AS quantity, 500::BIGINT AS unit_price_minor, 500::BIGINT AS total_minor, "
             "'orders/metadata.json' AS first_manifest; "
             "CREATE TABLE raw.exchange_rates AS SELECT 'ECB' AS provider, 'EUR' AS base, "
-            "quote, current_date AS rate_date, "
+            "quote, CURRENT_DATE AS rate_date, "
             "366.33::DECIMAL(24,12) AS rate, quote || '/metadata.json' AS first_manifest "
             "FROM (VALUES ('HUF'),('PLN'),('CZK'),('RON'),('GBP'),"
             "('CHF'),('SEK'),('NOK'),('DKK')) q(quote); "
@@ -51,7 +51,7 @@ def test_airflow_task_runs_isolated_dbt_and_propagates_quality_failure():
             "'orders-v3' AS dataset_version, "
             "42::BIGINT AS seed, 600::BIGINT AS interval_seconds; "
             "CREATE TABLE ops.loaded_batches AS SELECT first_manifest AS manifest_path, "
-            "'exchange-rates' AS source, current_timestamp AS loaded_at FROM raw.exchange_rates; "
+            "'exchange-rates' AS source, CURRENT_TIMESTAMP AS loaded_at FROM raw.exchange_rates; "
             "CREATE TABLE ops.fx_batch_records AS SELECT first_manifest AS manifest_path, "
             'provider,base,quote,rate_date,rate_date AS requested_date FROM raw.exchange_rates"); '
             "c.close(); permissions(p)",
@@ -78,8 +78,8 @@ assert result['models_succeeded']==3 and result['tests_passed']==37, result
 assert Path(result['artifact_directory']).is_relative_to('/opt/airflow/logs/dbt')
 with FileLock('/warehouse/retailflow.duckdb.lock',mode=0o660,timeout=60):
     with duckdb.connect('/warehouse/retailflow.duckdb') as c:
-        assert c.execute('select count(*) from staging.stg_orders').fetchone()==(1,)
-        c.execute('update raw.orders set quantity=-1')
+        assert c.execute('SELECT COUNT(*) FROM staging.stg_orders').fetchone()==(1,)
+        c.execute('UPDATE raw.orders SET quantity=-1')
 context['ti'].try_number=2
 try:
     task.python_callable({'source':'orders','rows_inserted':0})

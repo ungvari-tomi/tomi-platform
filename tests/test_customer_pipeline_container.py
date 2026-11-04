@@ -190,9 +190,9 @@ assert result['freshness_sources_passed']==2 and result['freshness_tests_passed'
 path='/warehouse/retailflow.duckdb'
 with FileLock(path+'.lock',mode=0o660):
     with duckdb.connect(path) as db:
-        assert db.execute('select count(*) from staging.customer_orders').fetchone()[0]==20
-        assert db.execute('select count(*) from staging.customer_orders '
-                          'where customer_as_of is null').fetchone()[0]==0
+        assert db.execute('SELECT COUNT(*) FROM staging.customer_orders').fetchone()[0]==20
+        assert db.execute('SELECT COUNT(*) FROM staging.customer_orders '
+                          'WHERE customer_as_of IS NULL').fetchone()[0]==0
 
 def failure(label, mutation, restoration):
     with FileLock(path+'.lock',mode=0o660):
@@ -214,15 +214,15 @@ failure('missing_customer',
  'DELETE FROM privacy_demo.customers',
  'INSERT INTO privacy_demo.customers SELECT * FROM saved_customers; DROP TABLE saved_customers')
 failure('orphan_customer',
- "INSERT INTO privacy_demo.customers SELECT dataset_id,customer_token,current_date-1,"
+ "INSERT INTO privacy_demo.customers SELECT dataset_id,customer_token,CURRENT_DATE-1,"
  "country,age_band,synthetic FROM privacy_demo.customers LIMIT 1",
- 'DELETE FROM privacy_demo.customers WHERE as_of=current_date-1')
+ 'DELETE FROM privacy_demo.customers WHERE as_of=CURRENT_DATE-1')
 failure('unexpected_personal_field',
  'ALTER TABLE privacy_demo.customers ADD COLUMN email VARCHAR',
  'ALTER TABLE privacy_demo.customers DROP COLUMN email')
 failure('stale_customer_orders',
  "CREATE TABLE saved_clocks AS SELECT order_id,created_at FROM privacy_demo.orders; "
- "UPDATE privacy_demo.orders SET created_at=current_timestamp-interval '31 minutes'",
+ "UPDATE privacy_demo.orders SET created_at=CURRENT_TIMESTAMP-INTERVAL '31 minutes'",
  'UPDATE privacy_demo.orders o SET created_at=s.created_at FROM saved_clocks s '
  'WHERE s.order_id=o.order_id; DROP TABLE saved_clocks')
 print('PASS customer pipeline, paused DAG, private child environment and 4 corruptions',flush=True)

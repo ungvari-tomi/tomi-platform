@@ -1,12 +1,12 @@
-select *
-from {{ ref('orders_eur') }}
-where
-    (conversion_status in ('identity', 'converted')
-     and (eur_total_minor is null or eur_total_minor < 0 or total_eur is null))
-    or (conversion_status not in ('identity', 'converted')
-        and (eur_total_minor is not null or total_eur is not null))
-    or (conversion_status = 'identity' and (currency_code != 'EUR' or eur_total_minor != total_minor))
-    or (conversion_status = 'converted'
-        and (currency_code = 'EUR' or fx_age_days not between 0 and 7
-             or currency_units_per_eur <= 0 or fx_request_manifest_path is null))
-    or fx_rate_date > order_date
+SELECT *
+FROM {{ ref('orders_eur') }}
+WHERE
+    (conversion_status IN ('identity', 'converted')
+     AND (eur_total_minor IS NULL OR eur_total_minor < 0 OR total_eur IS NULL))
+    OR (conversion_status NOT IN ('identity', 'converted')
+        AND (eur_total_minor IS NOT NULL OR total_eur IS NOT NULL))
+    OR (conversion_status = 'identity' AND (currency_code != 'EUR' OR eur_total_minor != total_minor))
+    OR (conversion_status = 'converted'
+        AND (currency_code = 'EUR' OR fx_age_days NOT BETWEEN 0 AND 7
+             OR currency_units_per_eur <= 0 OR fx_request_manifest_path IS NULL))
+    OR fx_rate_date > order_date

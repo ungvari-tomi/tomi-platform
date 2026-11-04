@@ -78,9 +78,9 @@ def test_both_dataset_versions_land_and_load_without_collision(tmp_path):
 
     asyncio.run(run())
     with duckdb.connect(str(database)) as connection:
-        assert connection.execute("select count(*) from raw.orders").fetchone() == (200,)
-        assert connection.execute("select count(*) from ops.datasets").fetchone() == (2,)
-        assert connection.execute("select count(distinct currency) from raw.orders").fetchone() == (
+        assert connection.execute("SELECT COUNT(*) FROM raw.orders").fetchone() == (200,)
+        assert connection.execute("SELECT COUNT(*) FROM ops.datasets").fetchone() == (2,)
+        assert connection.execute("SELECT COUNT(DISTINCT currency) FROM raw.orders").fetchone() == (
             10,
         )
 
@@ -109,7 +109,7 @@ def test_backfill_preserves_response_after_upload_failure_and_skips_covered_pair
     with duckdb.connect(str(database)) as c:
         c.execute(DDL)
         c.execute(
-            "insert into raw.orders values ('d',1,'2026-10-31T12:00:00Z',"
+            "INSERT INTO raw.orders VALUES ('d',1,'2026-10-31T12:00:00Z',"
             "'PL','PLN','p',1,2000,2000,'m')"
         )
     calls = []
@@ -151,11 +151,11 @@ def test_backfill_bounds_scope_before_any_network_call(tmp_path):
     with duckdb.connect(str(database)) as c:
         c.execute(DDL)
         c.execute(
-            "insert into raw.orders values ('d',1,'2026-10-30T12:00:00Z',"
+            "INSERT INTO raw.orders VALUES ('d',1,'2026-10-30T12:00:00Z',"
             "'HU','HUF','p',1,200000,200000,'m')"
         )
         c.execute(
-            "insert into raw.orders values ('d',2,'2026-10-31T12:00:00Z',"
+            "INSERT INTO raw.orders VALUES ('d',2,'2026-10-31T12:00:00Z',"
             "'HU','HUF','p',1,200000,200000,'m')"
         )
     with pytest.raises(ValueError, match="max_pairs"):

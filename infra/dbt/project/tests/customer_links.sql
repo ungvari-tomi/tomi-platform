@@ -1,23 +1,23 @@
 {{ config(enabled=var('customer_pipeline', false), tags=['customers']) }}
 -- Missing, orphaned or inconsistent snapshots remain visible as failing checks.
-select 'missing_or_mismatched' as issue
-from {{ ref('customer_orders') }}
-where customer_as_of is null or customer_country != country
-   or synthetic is distinct from true
-union all
-select 'orphan_snapshot' as issue
-from {{ ref('stg_customers') }} c
-where not exists (
-  select 1 from {{ source('customer_demo', 'customer_batches') }} cb
-  join {{ source('customer_demo', 'order_batches') }} ob
-    on ob.manifest = cb.manifest and ob.dataset_id = cb.dataset_id
-  join {{ ref('stg_customer_orders') }} o
-    on o.dataset_id = ob.dataset_id and o.order_id = ob.order_id
-   and o.customer_token = cb.customer_token
-  where cb.dataset_id = c.dataset_id and cb.customer_token = c.customer_token
-    and cb.as_of = c.as_of
+SELECT 'missing_or_mismatched' AS issue
+FROM {{ ref('customer_orders') }}
+WHERE customer_as_of IS NULL OR customer_country != country
+   OR synthetic IS DISTINCT FROM TRUE
+UNION ALL
+SELECT 'orphan_snapshot' AS issue
+FROM {{ ref('stg_customers') }} c
+WHERE NOT EXISTS (
+  SELECT 1 FROM {{ source('customer_demo', 'customer_batches') }} cb
+  JOIN {{ source('customer_demo', 'order_batches') }} ob
+    ON ob.manifest = cb.manifest AND ob.dataset_id = cb.dataset_id
+  JOIN {{ ref('stg_customer_orders') }} o
+    ON o.dataset_id = ob.dataset_id AND o.order_id = ob.order_id
+   AND o.customer_token = cb.customer_token
+  WHERE cb.dataset_id = c.dataset_id AND cb.customer_token = c.customer_token
+    AND cb.as_of = c.as_of
 )
-union all
-select 'order_count_changed' as issue
-where (select count(*) from {{ ref('stg_customer_orders') }})
-   != (select count(*) from {{ ref('customer_orders') }})
+UNION ALL
+SELECT 'order_count_changed' AS issue
+WHERE (SELECT COUNT(*) FROM {{ ref('stg_customer_orders') }})
+   != (SELECT COUNT(*) FROM {{ ref('customer_orders') }})

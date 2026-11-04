@@ -12,6 +12,11 @@ environment reviewer, or prevent-self-review setting is introduced.
 
 ## Continuous integration
 
+The cross-platform checks job runs SQLFluff on `infra/dbt/project` alongside Ruff.
+SQL lint/parse/template errors fail CI. Delivery calls this workflow with full
+validation and packages only after it succeeds, so the same SQL gate applies
+to delivery. [Configuration and local commands](sql-style.md).
+
 `AGENTS.md` files are local instructions: Git ignores them case-insensitively and
 the source-delivery safety check rejects them even if force-added. The existing
 tracked copy has been removed from the index while preserving the local file.

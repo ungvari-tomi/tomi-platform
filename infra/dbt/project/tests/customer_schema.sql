@@ -8,12 +8,12 @@
  'order_batches': ['manifest','dataset_id','order_id'],
  'customer_batches': ['manifest','dataset_id','customer_token','as_of']
 } %}
-select table_name, column_name from information_schema.columns
-where table_catalog = current_database() and table_schema = 'privacy_demo'
-  and (
+SELECT table_name, column_name FROM information_schema.columns
+WHERE table_catalog = CURRENT_DATABASE() AND table_schema = 'privacy_demo'
+  AND (
   {% for table, columns in contracts.items() %}
-    (table_name = '{{ table }}' and column_name not in (
+    (table_name = '{{ table }}' AND column_name NOT IN (
       {% for column in columns %}'{{ column }}'{% if not loop.last %},{% endif %}{% endfor %}
-    )){% if not loop.last %} or {% endif %}
+    )){% if not loop.last %} OR {% endif %}
   {% endfor %}
   )

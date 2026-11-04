@@ -30,6 +30,9 @@ def select(paths: list[str], *, full: bool = False) -> dict:
         if path == "retailflow/infrastructure.py":
             flags["checks"] = flags["terraform"] = True
             targets.update({"tests/test_infrastructure.py", "tests/test_release_review.py"})
+        elif path in {".sqlfluff", ".sqlfluffignore"}:
+            flags["checks"] = True
+            targets.add("tests/test_sql_style.py")
         elif path == "scripts/release_review.py":
             flags["checks"] = True
             targets.update({"tests/test_release_review.py", "tests/test_infrastructure.py"})

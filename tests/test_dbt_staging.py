@@ -94,10 +94,10 @@ def test_staging_preserves_grain_precision_and_detects_invalid_rows(tmp_path: Pa
             "retailflow-dbt:validation",
             "-c",
             "import duckdb,json; c=duckdb.connect('/warehouse/retailflow.duckdb'); "
-            "assert c.execute('SELECT count(*) FROM staging.stg_orders').fetchone()==(2,); "
+            "assert c.execute('SELECT COUNT(*) FROM staging.stg_orders').fetchone()==(2,); "
             "assert str(c.execute('SELECT quote_units_per_base_unit FROM "
             "staging.stg_exchange_rates').fetchone()[0])=='366.330000000001'; "
-            "assert c.execute('SELECT sum(total_minor) FROM raw.orders').fetchone()==(400500,); "
+            "assert c.execute('SELECT SUM(total_minor) FROM raw.orders').fetchone()==(400500,); "
             'print(json.dumps(c.execute("SELECT table_name,table_type FROM '
             "information_schema.tables WHERE table_schema='staging' ORDER BY 1\").fetchall())); "
             'c.execute("INSERT INTO raw.orders SELECT * FROM raw.orders '

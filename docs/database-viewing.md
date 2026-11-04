@@ -52,10 +52,10 @@ it does not automatically show subsequent Airflow or dbt changes.
 5. Open an SQL editor for that connection and run:
 
 ```sql
-select *
-from raw.orders
-order by created_at desc
-limit 100;
+SELECT *
+FROM raw.orders
+ORDER BY created_at DESC
+LIMIT 100;
 ```
 
 Other starting points are `raw.exchange_rates` and `ops.loaded_batches`. Any dbt

@@ -232,7 +232,7 @@ def test_airflow_initializes_real_postgres_without_managed_resources() -> None:
             "-d",
             "airflow",
             "-tAc",
-            "SELECT count(*) FROM alembic_version",
+            "SELECT COUNT(*) FROM alembic_version",
         ).stdout.strip()
         assert version == "1"
         denied = docker(

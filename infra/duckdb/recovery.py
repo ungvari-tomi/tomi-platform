@@ -26,17 +26,17 @@ def inventory(path: Path) -> dict:
     ) as connection:
         tables = connection.execute(
             "SELECT table_schema, table_name FROM information_schema.tables "
-            "WHERE table_catalog=current_database() AND table_type='BASE TABLE' "
+            "WHERE table_catalog=CURRENT_DATABASE() AND table_type='BASE TABLE' "
             "ORDER BY table_schema, table_name"
         ).fetchall()
         counts = []
         for schema, table in tables:
             # Names come from the catalog and are quoted as SQL identifiers.
             quoted = ".".join('"' + name.replace('"', '""') + '"' for name in (schema, table))
-            count = connection.execute(f"SELECT count(*) FROM {quoted}").fetchone()[0]  # nosec B608
+            count = connection.execute(f"SELECT COUNT(*) FROM {quoted}").fetchone()[0]  # nosec B608
             counts.append({"schema": schema, "table": table, "rows": count})
         return {
-            "duckdb_version": connection.execute("SELECT version()").fetchone()[0],
+            "duckdb_version": connection.execute("SELECT VERSION()").fetchone()[0],
             "tables": counts,
         }
 

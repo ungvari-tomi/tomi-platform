@@ -1,5 +1,10 @@
 # Terraform-managed dbt Core runtime
 
+SQL uses uppercase keywords, function names, types and SQL NULL/boolean literals.
+Keep column/table names, aliases, quoted values and Jinja syntax unchanged. Run
+`uv run --locked sqlfluff lint infra/dbt/project` to check, or replace `lint`
+with `fix` to apply the configured capitalization rules. See [SQL style and CI](sql-style.md).
+
 [dbt freshness and failure-event email](dbt-freshness.md) adds deployed and verified
 freshness/pipeline actions and current dataset-identity settings. The updated
 runtime images were deployed on 2026-11-04; ordinary build retains historical-model

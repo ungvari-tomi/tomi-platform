@@ -12,11 +12,11 @@ sources:
           freshness:
             error_after: {count: 30, period: minute}
             filter: >-
-              dataset_id in (select ob.dataset_id from privacy_demo.order_batches ob
-              join privacy_demo.batches b on b.manifest = ob.manifest
-              where b.seed = {{ env_var('RETAILFLOW_SEED', '42') | int }}
-              and b.interval_seconds = {{ env_var('RETAILFLOW_INTERVAL_SECONDS', '600') | int }}
-              and b.key_id = '{{ env_var("RETAILFLOW_CUSTOMER_PRIVACY_KEY_ID", "local-v1") | replace("'", "''") }}')
+              dataset_id IN (SELECT ob.dataset_id FROM privacy_demo.order_batches ob
+              JOIN privacy_demo.batches b ON b.manifest = ob.manifest
+              WHERE b.seed = {{ env_var('RETAILFLOW_SEED', '42') | int }}
+              AND b.interval_seconds = {{ env_var('RETAILFLOW_INTERVAL_SECONDS', '600') | int }}
+              AND b.key_id = '{{ env_var("RETAILFLOW_CUSTOMER_PRIVACY_KEY_ID", "local-v1") | replace("'", "''") }}')
       - name: customers
       - name: order_batches
       - name: customer_batches
@@ -27,5 +27,5 @@ sources:
             error_after: {count: 30, period: minute}
             filter: >-
               seed = {{ env_var('RETAILFLOW_SEED', '42') | int }}
-              and interval_seconds = {{ env_var('RETAILFLOW_INTERVAL_SECONDS', '600') | int }}
-              and key_id = '{{ env_var("RETAILFLOW_CUSTOMER_PRIVACY_KEY_ID", "local-v1") | replace("'", "''") }}'
+              AND interval_seconds = {{ env_var('RETAILFLOW_INTERVAL_SECONDS', '600') | int }}
+              AND key_id = '{{ env_var("RETAILFLOW_CUSTOMER_PRIVACY_KEY_ID", "local-v1") | replace("'", "''") }}'

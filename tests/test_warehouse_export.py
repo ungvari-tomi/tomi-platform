@@ -102,7 +102,7 @@ def test_repeated_exports_are_independent_while_previous_snapshot_is_open(tmp_pa
                     (1,),
                     (2,),
                 ]
-                assert latest.execute("SELECT count(*) FROM staging.order_view").fetchone() == (2,)
+                assert latest.execute("SELECT COUNT(*) FROM staging.order_view").fetchone() == (2,)
         assert len(list(destination.glob("*/snapshot.json"))) == 2
         assert first["tables"] == [{"schema": "raw", "table": "orders", "rows": 1}]
         assert second["tables"] == [{"schema": "raw", "table": "orders", "rows": 2}]

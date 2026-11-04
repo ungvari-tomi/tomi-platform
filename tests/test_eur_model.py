@@ -52,7 +52,7 @@ def test_eur_model_exact_rounding_date_matching_and_visible_gaps(tmp_path: Path)
                 orders.append((len(orders) + 1, "2026-10-30T12:00:00Z", country, currency, minimum))
         for identifier, created, country, currency, total in orders:
             c.execute(
-                "insert into raw.orders values ('dataset',?,?,?,?,'p',1,?,?,'m')",
+                "INSERT INTO raw.orders VALUES ('dataset',?,?,?,?,'p',1,?,?,'m')",
                 [identifier, created, country, currency, total, total],
             )
         rates = [
@@ -64,7 +64,7 @@ def test_eur_model_exact_rounding_date_matching_and_visible_gaps(tmp_path: Path)
         rates += [(quote, "2026-10-30", rate) for quote, rate in quote_rates.items()]
         for quote, published, rate in rates:
             c.execute(
-                "insert into raw.exchange_rates values ('ECB','EUR',?,?,?,'rate-manifest')",
+                "INSERT INTO raw.exchange_rates VALUES ('ECB','EUR',?,?,?,'rate-manifest')",
                 [quote, published, Decimal(rate)],
             )
         requests = [
@@ -78,7 +78,7 @@ def test_eur_model_exact_rounding_date_matching_and_visible_gaps(tmp_path: Path)
         requests += [requests[0]]  # Duplicate requests must not duplicate orders.
         for i, (quote, requested, published) in enumerate(requests):
             c.execute(
-                "insert into ops.fx_batch_records values (?,'ECB','EUR',?,?,?)",
+                "INSERT INTO ops.fx_batch_records VALUES (?,'ECB','EUR',?,?,?)",
                 [f"request-{i}", quote, published, requested],
             )
     owner = "retailflow-eur-test-" + uuid4().hex
@@ -141,8 +141,8 @@ def test_eur_model_exact_rounding_date_matching_and_visible_gaps(tmp_path: Path)
             "retailflow-dbt:validation",
             "-c",
             "import duckdb,json; c=duckdb.connect('/warehouse/retailflow.duckdb'); "
-            "print(json.dumps(c.execute('select order_id,order_date,conversion_status,"
-            "eur_total_minor,total_eur from staging.orders_eur order by order_id')"
+            "print(json.dumps(c.execute('SELECT order_id,order_date,conversion_status,"
+            "eur_total_minor,total_eur FROM staging.orders_eur ORDER BY order_id')"
             ".fetchall(),default=str))",
         )
         rows = {r[0]: r for r in json.loads(exported)}

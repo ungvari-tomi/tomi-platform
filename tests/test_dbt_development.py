@@ -111,7 +111,7 @@ def test_local_model_edits_build_without_rebuilding_image(tmp_path: Path):
                 "-c",
                 "import duckdb,json; "
                 "c=duckdb.connect('/warehouse/retailflow.duckdb',read_only=True); "
-                "print(json.dumps(c.execute('select * from staging.dev_probe').fetchall()))",
+                "print(json.dumps(c.execute('SELECT * FROM staging.dev_probe').fetchall()))",
             )
             assert json.loads(observed.stdout) == [[123, revision]]
         results = list(artifacts.glob("*/target/run_results.json"))

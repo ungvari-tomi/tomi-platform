@@ -12,6 +12,13 @@ def test_documentation_only_skips_runtime_jobs():
     assert selected["tests"] == []
 
 
+@pytest.mark.parametrize("path", [".sqlfluff", ".sqlfluffignore"])
+def test_sql_lint_configuration_selects_style_checks_without_images(path):
+    selected = ci_select.select([path])
+    assert selected["checks"] and not selected["integration"]
+    assert selected["tests"] == ["tests/test_sql_style.py"]
+
+
 def test_local_helper_selects_related_tests_without_images():
     selected = ci_select.select(["scripts/release_review.py", "retailflow/infrastructure.py"])
     assert selected["checks"] and selected["terraform"]

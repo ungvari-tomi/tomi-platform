@@ -79,13 +79,13 @@ GUI to the live warehouse volume; open the exported retailflow.duckdb instead.
 PowerShell execution-policy alternatives are in the [development guide](dbt-runtime.md#develop-models-from-vs-code).
 
 ```sql
-select dataset_id, order_id, ordered_at, currency_code, total_minor
-from staging.stg_orders
-order by ordered_at desc
-limit 100;
+SELECT dataset_id, order_id, ordered_at, currency_code, total_minor
+FROM staging.stg_orders
+ORDER BY ordered_at DESC
+LIMIT 100;
 
-select rate_provider, rate_date, quote_units_per_base_unit
-from staging.stg_exchange_rates;
+SELECT rate_provider, rate_date, quote_units_per_base_unit
+FROM staging.stg_exchange_rates;
 ```
 
 Logs and compiled test queries are retained under ignored
