@@ -3,11 +3,13 @@
 import base64
 import hashlib
 import hmac
+import json
 import os
 import re
 import secrets
 from dataclasses import dataclass, field
 from datetime import date
+from pathlib import Path
 from typing import Literal
 
 from dotenv import dotenv_values
@@ -47,6 +49,16 @@ class PrivacyKey:
     def token(self, identifier: str) -> str:
         message = f"retailflow/customer/v1:{self.key_id}:{identifier}".encode()
         return f"ct1_{self.key_id}_" + hmac.new(self.value, message, hashlib.sha256).hexdigest()
+
+    @classmethod
+    def from_file(cls, path: Path) -> "PrivacyKey":
+        try:
+            record = json.loads(path.read_text(encoding="utf-8"))
+            if set(record) != {"key", "key_id"}:
+                raise ValueError()
+            return cls(base64.b64decode(record["key"], validate=True), record["key_id"])
+        except (OSError, ValueError, TypeError, KeyError):
+            raise ValueError("Customer key file is missing or invalid") from None
 
 
 class PrivateOrder(Order):
@@ -127,3 +139,17 @@ def initialize_key() -> None:
     encoded = base64.b64encode(secrets.token_bytes(32)).decode()
     with open(".env", "a", encoding="utf-8") as output:
         output.write("\nRETAILFLOW_CUSTOMER_PRIVACY_KEY=" + encoded + "\n")
+
+
+def prepare_key_file() -> None:
+    """Copy the existing local key for a scheduler-only read-only bind mount."""
+    key = PrivacyKey.from_environment()
+    path = Path(".local-secrets/customer.json")
+    path.parent.mkdir(mode=0o700, exist_ok=True)
+    if path.exists():
+        if PrivacyKey.from_file(path) != key:
+            raise ValueError("Existing scheduler key differs; explicit rotation review required")
+        return
+    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(descriptor, "w", encoding="utf-8") as output:
+        json.dump({"key": base64.b64encode(key.value).decode(), "key_id": key.key_id}, output)

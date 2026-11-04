@@ -46,6 +46,21 @@ variable "orders_seed" {
   default = 42
 }
 
+variable "customer_pipeline_enabled" {
+  type        = bool
+  default     = false
+  description = "Mount the pre-created local customer key into the scheduler only. New DAG stays paused."
+}
+
+variable "customer_privacy_key_id" {
+  type    = string
+  default = "local-v1"
+  validation {
+    condition     = can(regex("^[a-z0-9-]{1,24}$", var.customer_privacy_key_id))
+    error_message = "Use a safe public customer key ID."
+  }
+}
+
 locals {
   application_context = abspath("${path.module}/../..")
   application_hash = sha256(join("", [
@@ -78,6 +93,7 @@ locals {
     "RETAILFLOW_DATASET_VERSION=${var.orders_dataset_version}",
     "RETAILFLOW_SEED=${var.orders_seed}",
     "RETAILFLOW_INTERVAL_SECONDS=${var.orders_interval_seconds}",
+    "RETAILFLOW_CUSTOMER_PRIVACY_KEY_ID=${var.customer_privacy_key_id}",
   ]
 }
 
@@ -227,9 +243,13 @@ resource "docker_container" "airflow" {
     for_each = each.key == "dag-processor" ? [1] : []
     content { name = docker_network.mailpit.name }
   }
-  user           = "50000:0"
-  group_add      = each.key == "scheduler" ? ["10001"] : []
-  env            = concat(local.airflow_env, each.key == "scheduler" ? ["RETAILFLOW_DUCKDB_PATH=/warehouse/retailflow.duckdb"] : [])
+  user      = "50000:0"
+  group_add = each.key == "scheduler" ? ["10001"] : []
+  env = concat(local.airflow_env, each.key == "scheduler" ? [
+    "RETAILFLOW_DUCKDB_PATH=/warehouse/retailflow.duckdb"
+    ] : [], each.key == "scheduler" && var.customer_pipeline_enabled ? [
+    "RETAILFLOW_CUSTOMER_PRIVACY_KEY_FILE=/run/retailflow-secrets/customer.json"
+  ] : [])
   command        = ["python", "/opt/airflow/start.py", each.key]
   memory         = each.key == "scheduler" ? 1536 : 1024
   memory_swap    = each.key == "scheduler" ? 3072 : 2048
@@ -254,6 +274,15 @@ resource "docker_container" "airflow" {
       internal = 8080
       external = 8080
       ip       = "127.0.0.1"
+    }
+  }
+  dynamic "mounts" {
+    for_each = each.key == "scheduler" && var.customer_pipeline_enabled ? [1] : []
+    content {
+      target    = "/run/retailflow-secrets/customer.json"
+      source    = abspath("${path.module}/../../.local-secrets/customer.json")
+      type      = "bind"
+      read_only = true
     }
   }
   dynamic "mounts" {

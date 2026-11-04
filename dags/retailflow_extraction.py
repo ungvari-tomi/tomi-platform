@@ -95,5 +95,47 @@ def exchange_rates():
     dbt_build(load(extract()))
 
 
+@dag(
+    dag_id="retailflow_customers",
+    schedule="*/10 * * * *",
+    start_date=datetime(2026, 1, 1, tzinfo=UTC),
+    catchup=False,
+    max_active_runs=1,
+    is_paused_upon_creation=True,
+    on_failure_callback=dag_failure,
+    default_args={
+        "retries": 2,
+        "retry_delay": timedelta(seconds=30),
+        "execution_timeout": timedelta(minutes=20),
+    },
+    tags=["retailflow", "customers", "pseudonymized"],
+)
+def customers():
+    @task
+    def extract():
+        from retailflow.customer_scheduling import scheduled_extract
+
+        result = scheduled_extract(get_current_context()["run_id"])
+        return {"cursor": result["cursor"], "batches": len(result["manifests"])}
+
+    @task
+    def load(extraction_result: dict):
+        from retailflow.customer_scheduling import scheduled_load
+
+        return scheduled_load()
+
+    @task
+    def dbt_build(load_result: dict):
+        from retailflow.transformation import scheduled_build
+
+        context = get_current_context()
+        return scheduled_build(
+            context["dag"].dag_id, context["run_id"], context["ti"].try_number, customers=True
+        )
+
+    dbt_build(load(extract()))
+
+
 orders()
 exchange_rates()
+customers()

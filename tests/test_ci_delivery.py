@@ -21,6 +21,7 @@ from scripts import ci_safety, release_bundle
         "warehouse.duckdb.lock",
         "AGENTS.md",
         "docs/agents.md",
+        ".local-secrets/customer.json",
     ],
 )
 def test_operational_files_are_rejected_without_reading_them(monkeypatch, tmp_path, name):

@@ -1,0 +1,31 @@
+version: 2
+sources:
+  - name: customer_demo
+    schema: privacy_demo
+    description: Minimized synthetic customers and orders; no direct identifiers or key material.
+    config:
+      enabled: "{{ var('customer_pipeline', false) }}"
+    tables:
+      - name: orders
+        config:
+          loaded_at_field: created_at
+          freshness:
+            error_after: {count: 30, period: minute}
+            filter: >-
+              dataset_id in (select ob.dataset_id from privacy_demo.order_batches ob
+              join privacy_demo.batches b on b.manifest = ob.manifest
+              where b.seed = {{ env_var('RETAILFLOW_SEED', '42') | int }}
+              and b.interval_seconds = {{ env_var('RETAILFLOW_INTERVAL_SECONDS', '600') | int }}
+              and b.key_id = '{{ env_var("RETAILFLOW_CUSTOMER_PRIVACY_KEY_ID", "local-v1") | replace("'", "''") }}')
+      - name: customers
+      - name: order_batches
+      - name: customer_batches
+      - name: batches
+        config:
+          loaded_at_field: loaded_at
+          freshness:
+            error_after: {count: 30, period: minute}
+            filter: >-
+              seed = {{ env_var('RETAILFLOW_SEED', '42') | int }}
+              and interval_seconds = {{ env_var('RETAILFLOW_INTERVAL_SECONDS', '600') | int }}
+              and key_id = '{{ env_var("RETAILFLOW_CUSTOMER_PRIVACY_KEY_ID", "local-v1") | replace("'", "''") }}'

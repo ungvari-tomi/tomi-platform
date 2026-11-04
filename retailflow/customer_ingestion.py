@@ -6,7 +6,7 @@ import hashlib
 import io
 import json
 import re
-from datetime import UTC, date
+from datetime import UTC, date, datetime
 from pathlib import Path
 from uuid import uuid4
 
@@ -21,7 +21,14 @@ from retailflow.currencies import valid_price
 from retailflow.customers import CustomerPage
 from retailflow.extraction import load, save
 from retailflow.landing import Store
-from retailflow.privacy import PrivacyKey, PrivateCustomer, PrivateOrder, initialize_key, minimize
+from retailflow.privacy import (
+    PrivacyKey,
+    PrivateCustomer,
+    PrivateOrder,
+    initialize_key,
+    minimize,
+    prepare_key_file,
+)
 
 
 def validate_safe(stage: dict) -> tuple[list[PrivateOrder], list[PrivateCustomer]]:
@@ -152,6 +159,7 @@ def extract_private(
     *,
     after_id: int | None = None,
     limit: int = 20,
+    expected_profile: tuple[int, int] | None = None,
 ) -> str:
     if not 1 <= limit <= 100:
         raise ValueError("Private batches require 1-100 orders")
@@ -165,6 +173,8 @@ def extract_private(
             save(path, stage)  # Only minimized data is ever staged, including on failure/retry.
         elif stage.get("key_id") != key.key_id:
             raise ValueError("Privacy key ID changed during batch retry")
+        if expected_profile and (stage["seed"], stage["interval_seconds"]) != expected_profile:
+            raise ValueError("Customer source profile differs from scheduled configuration")
         return land_private(store, stage, identity)
 
 
@@ -179,6 +189,10 @@ CREATE TABLE IF NOT EXISTS privacy_demo.customers (
  age_band VARCHAR, synthetic BOOLEAN, PRIMARY KEY(dataset_id,customer_token,as_of));
 CREATE TABLE IF NOT EXISTS privacy_demo.batches (
  manifest VARCHAR PRIMARY KEY, sha256 VARCHAR NOT NULL);
+ALTER TABLE privacy_demo.batches ADD COLUMN IF NOT EXISTS loaded_at TIMESTAMPTZ;
+ALTER TABLE privacy_demo.batches ADD COLUMN IF NOT EXISTS seed BIGINT;
+ALTER TABLE privacy_demo.batches ADD COLUMN IF NOT EXISTS interval_seconds INTEGER;
+ALTER TABLE privacy_demo.batches ADD COLUMN IF NOT EXISTS key_id VARCHAR;
 CREATE TABLE IF NOT EXISTS privacy_demo.order_batches (
  manifest VARCHAR, dataset_id VARCHAR, order_id BIGINT,
  PRIMARY KEY(manifest,dataset_id,order_id));
@@ -300,7 +314,16 @@ def load_private(store: Store, manifest: str, database: Path) -> dict:
                         [manifest, *record[:3]],
                     )
                 connection.execute(
-                    "INSERT INTO privacy_demo.batches VALUES (?,?)", [manifest, checksum]
+                    "INSERT INTO privacy_demo.batches "
+                    "(manifest,sha256,loaded_at,seed,interval_seconds,key_id) VALUES (?,?,?,?,?,?)",
+                    [
+                        manifest,
+                        checksum,
+                        datetime.now(UTC),
+                        metadata["seed"],
+                        metadata["interval_seconds"],
+                        metadata["key_id"],
+                    ],
                 )
                 connection.execute("COMMIT")
             except Exception:
@@ -313,6 +336,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="action", required=True)
     sub.add_parser("init-key")
+    sub.add_parser("prepare-key-file")
     extract = sub.add_parser("extract")
     extract.add_argument("--run-id", default=None)
     extract.add_argument("--limit", type=int, default=20)
@@ -325,6 +349,10 @@ def main() -> None:
         if args.action == "init-key":
             initialize_key()
             print(json.dumps({"status": "privacy_key_ready"}))
+            return
+        if args.action == "prepare-key-file":
+            prepare_key_file()
+            print(json.dumps({"status": "scheduler_key_file_ready"}))
             return
         store = BlobStore()
         try:

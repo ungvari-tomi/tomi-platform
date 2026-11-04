@@ -13,7 +13,7 @@ from uuid import uuid4
 
 from filelock import FileLock
 
-ALLOWED_DAGS = {"retailflow_orders", "retailflow_exchange_rates"}
+ALLOWED_DAGS = {"retailflow_orders", "retailflow_exchange_rates", "retailflow_customers"}
 
 
 def send_capture(subject: str, body: str, identity: str, *, host: str, port: int = 1025) -> None:

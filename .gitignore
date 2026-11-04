@@ -221,6 +221,7 @@ __marimo__/
 
 # RetailFlow local runtimes and generated data
 [Aa][Gg][Ee][Nn][Tt][Ss].[Mm][Dd]
+.local-secrets/
 .bootstrap/
 .python-runtime/
 .uv-cache/

@@ -89,6 +89,28 @@ def test_dbt_lock_matches_shared_duckdb_version_and_export_hashes():
             }
 
 
+def test_customer_pipeline_limits_selection_and_keeps_all_phases_locked(monkeypatch, tmp_path):
+    database = tmp_path / "retailflow.duckdb"
+    database.write_bytes(b"fixture")
+    monkeypatch.setattr(run.shutil, "which", lambda _: "dbt")
+    calls = []
+
+    def execute(command, **kwargs):
+        with pytest.raises(Timeout):
+            FileLock(str(database) + ".lock", mode=0o660).acquire(timeout=0)
+        assert command[command.index("--vars") + 1] == '{"customer_pipeline": true}'
+        calls.append(command)
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(run.subprocess, "run", execute)
+    assert run.execute("customer-pipeline", database, tmp_path / "artifacts") == 0
+    assert [c[c.index("--select") + 1] for c in calls] == [
+        "source:customer_demo",
+        "tag:customer_freshness",
+        "tag:customers",
+    ]
+
+
 @pytest.mark.skipif(os.environ.get("RETAILFLOW_TEST_DBT_IMAGE") != "1", reason="Opt-in dbt image")
 def test_real_dbt_checks_and_parses_without_creating_business_models():
     name = "retailflow-dbt-test-" + uuid4().hex

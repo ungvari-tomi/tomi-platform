@@ -1,5 +1,9 @@
 # Local Terraform migration
 
+The [customer integration](customer-pipeline.md) prepares a scheduler-only read-only
+key-file mount, disabled by default. Key material does not enter Terraform state.
+Deployment and schedule activation are pending review.
+
 [Ten-currency generation and EUR valuation](european-currencies.md) are deployed; the versioned migration and live pipelines are verified.
 
 [Airflow dbt automation](airflow-dbt.md) is deployed; both live three-task verification runs passed.

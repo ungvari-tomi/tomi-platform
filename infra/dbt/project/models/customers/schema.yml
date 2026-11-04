@@ -1,0 +1,45 @@
+version: 2
+models:
+  - name: stg_customer_orders
+    description: Customer-linked orders preserving original amounts and pseudonyms.
+    data_tests:
+      - unique_business_key:
+          arguments:
+            columns: [dataset_id, order_id]
+    columns:
+      - name: dataset_id
+        data_tests: [not_null]
+      - name: order_id
+        data_tests: [not_null]
+      - name: customer_token
+        data_tests: [not_null]
+  - name: stg_customers
+    description: Dated minimized customer snapshots; country and age band remain linkable.
+    data_tests:
+      - unique_business_key:
+          arguments:
+            columns: [dataset_id, customer_token, as_of]
+    columns:
+      - name: dataset_id
+        data_tests: [not_null]
+      - name: customer_token
+        data_tests: [not_null]
+      - name: as_of
+        data_tests: [not_null]
+      - name: age_band
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [under-18, 18-24, 25-34, 35-44, 45-54, 55-64, 65+]
+  - name: customer_orders
+    description: One row per order with its latest same-batch customer snapshot.
+    data_tests:
+      - unique_business_key:
+          arguments:
+            columns: [dataset_id, order_id]
+    columns:
+      - name: customer_as_of
+        data_tests: [not_null]
+      - name: customer_country
+        data_tests: [not_null]

@@ -1,8 +1,9 @@
 # Synthetic customers and privacy controls
 
-Status: implemented as a separate local demonstration, with disposable-source and
-warehouse tests. The new endpoints and loader are not deployed into the existing
-Airflow schedules or dbt models. Existing orders-v2/v3 history remains unchanged.
+Status: local implementation includes incremental Airflow extraction/loading and
+three dbt customer models, with disposable-source/warehouse tests. The extension
+is prepared for review and is not deployed. Existing orders-v2/v3 history and
+deployed workflows remain unchanged. See the [integration guide](customer-pipeline.md).
 
 ## What we are demonstrating
 

@@ -11,7 +11,7 @@ from pathlib import Path
 from uuid import uuid4
 
 
-def scheduled_build(dag_id: str, run_id: str, try_number: int) -> dict:
+def scheduled_build(dag_id: str, run_id: str, try_number: int, *, customers: bool = False) -> dict:
     identity = hashlib.sha256(json.dumps([dag_id, run_id, try_number]).encode()).hexdigest()
     directory = (
         Path(os.environ.get("RETAILFLOW_DBT_ARTIFACT_DIR", "/opt/airflow/logs/dbt"))
@@ -40,9 +40,17 @@ def scheduled_build(dag_id: str, run_id: str, try_number: int) -> dict:
         "RETAILFLOW_DATASET_VERSION": os.environ.get("RETAILFLOW_DATASET_VERSION", "orders-v3"),
         "RETAILFLOW_SEED": os.environ.get("RETAILFLOW_SEED", "42"),
         "RETAILFLOW_INTERVAL_SECONDS": os.environ.get("RETAILFLOW_INTERVAL_SECONDS", "600"),
+        "RETAILFLOW_CUSTOMER_PRIVACY_KEY_ID": os.environ.get(
+            "RETAILFLOW_CUSTOMER_PRIVACY_KEY_ID", "local-v1"
+        ),
     }
     subprocess.run(  # nosec B603
-        ["/opt/dbt/venv/bin/python", "-I", "/opt/dbt/run.py", "pipeline"],
+        [
+            "/opt/dbt/venv/bin/python",
+            "-I",
+            "/opt/dbt/run.py",
+            "customer-pipeline" if customers else "pipeline",
+        ],
         env=environment,
         check=True,
         timeout=450,
@@ -61,12 +69,13 @@ def scheduled_build(dag_id: str, run_id: str, try_number: int) -> dict:
         if len(paths) != 1:
             raise RuntimeError("Missing dbt freshness evidence")
         checks = json.loads(paths[0].read_text(encoding="utf-8"))["results"]
-        if len(checks) != 2 or any(row["status"] != "pass" for row in checks):
+        expected = 1 if customers and phase == "freshness_tests" else 2
+        if len(checks) != expected or any(row["status"] != "pass" for row in checks):
             raise RuntimeError("dbt freshness checks did not all pass")
     return {
         "artifact_directory": str(directory),
         "models_succeeded": sum(row["unique_id"].startswith("model.") for row in records),
         "tests_passed": sum(row["unique_id"].startswith("test.") for row in records),
         "freshness_sources_passed": 2,
-        "freshness_tests_passed": 2,
+        "freshness_tests_passed": 1 if customers else 2,
     }

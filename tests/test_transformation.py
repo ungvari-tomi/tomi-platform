@@ -8,15 +8,23 @@ import pytest
 from retailflow import transformation
 
 
-def test_build_sanitizes_environment_and_returns_small_summary(monkeypatch, tmp_path: Path):
+@pytest.mark.parametrize("customers", [False, True])
+def test_build_sanitizes_environment_and_returns_small_summary(
+    monkeypatch, tmp_path: Path, customers
+):
     monkeypatch.setenv("RETAILFLOW_DBT_ARTIFACT_DIR", str(tmp_path))
     monkeypatch.setenv("AIRFLOW_DB_PASSWORD", "test-only-not-a-secret")
     monkeypatch.setenv("PYTHONPATH", "must-not-enter-dbt")
+    monkeypatch.setenv("RETAILFLOW_CUSTOMER_PRIVACY_KEY_FILE", "/run/secrets/customer.json")
+    monkeypatch.setenv("RETAILFLOW_CUSTOMER_PRIVACY_KEY", "never-in-child-environment")
 
     def execute(command, *, env, check, timeout):
-        assert command == ["/opt/dbt/venv/bin/python", "-I", "/opt/dbt/run.py", "pipeline"]
+        action = "customer-pipeline" if customers else "pipeline"
+        assert command == ["/opt/dbt/venv/bin/python", "-I", "/opt/dbt/run.py", action]
         assert check is True and timeout == 450
         assert "AIRFLOW_DB_PASSWORD" not in env and "PYTHONPATH" not in env
+        assert "RETAILFLOW_CUSTOMER_PRIVACY_KEY" not in env
+        assert "RETAILFLOW_CUSTOMER_PRIVACY_KEY_FILE" not in env
         assert env["PYTHONNOUSERSITE"] == "1"
         target = Path(env["RETAILFLOW_DBT_ARTIFACT_DIR"]) / "invocation/target"
         target.mkdir(parents=True)
@@ -36,11 +44,14 @@ def test_build_sanitizes_environment_and_returns_small_summary(monkeypatch, tmp_
         ]:
             path = target.parent / phase / "target"
             path.mkdir(parents=True)
-            (path / filename).write_text(json.dumps({"results": [{"status": "pass"}] * 2}))
+            count = 1 if customers and phase == "freshness_tests" else 2
+            (path / filename).write_text(json.dumps({"results": [{"status": "pass"}] * count}))
         return SimpleNamespace(returncode=0)
 
     monkeypatch.setattr(transformation.subprocess, "run", execute)
-    result = transformation.scheduled_build("retailflow_orders", "manual__a/b", 1)
+    result = transformation.scheduled_build(
+        "retailflow_orders", "manual__a/b", 1, customers=customers
+    )
     assert result["models_succeeded"] == 1 and result["tests_passed"] == 1
     directory = Path(result["artifact_directory"])
     assert directory.is_relative_to(tmp_path)

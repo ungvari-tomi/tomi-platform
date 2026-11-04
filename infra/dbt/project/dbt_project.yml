@@ -5,3 +5,13 @@ profile: retailflow
 model-paths: [models]
 macro-paths: [macros]
 clean-targets: [target, dbt_packages]
+models:
+  retailflow:
+    customers:
+      +enabled: "{{ var('customer_pipeline', false) }}"
+      +tags: [customers]
+data_tests:
+  retailflow:
+    customers:
+      +enabled: "{{ var('customer_pipeline', false) }}"
+      +tags: [customers]

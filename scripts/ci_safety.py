@@ -26,6 +26,7 @@ def source_files(root: Path, *, include_untracked: bool = False) -> list[str]:
             ".venv",
             "__pycache__",
             ".bootstrap",
+            ".local-secrets",
             ".python-runtime",
             ".uv-cache",
             "artifacts",

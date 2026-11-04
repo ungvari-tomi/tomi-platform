@@ -1,5 +1,8 @@
 # Airflow dbt builds and data tests
 
+The opt-in [customer pipeline](customer-pipeline.md) adds a separate paused DAG
+and customer-only dbt selection; deployment is pending review.
+
 [dbt freshness and failure-event email](dbt-freshness.md) was deployed on 2026-11-04.
 It supersedes the single-build launcher below with a locked
 source-freshness -> freshness-tests -> build pipeline and a 450-second parent

@@ -1,5 +1,8 @@
 # Terraform-managed Airflow extraction and loading
 
+The [customer extension](customer-pipeline.md) is prepared locally with a separate
+paused DAG. It is not part of the deployed status described below.
+
 [Airflow dbt automation](airflow-dbt.md) is deployed; both live three-task verification runs passed.
 
 A [Terraform-managed dbt Core runtime](dbt-runtime.md) is deployed; its managed source checks passed.

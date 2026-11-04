@@ -241,6 +241,19 @@ def main() -> None:
     env["TF_VAR_orders_dataset_version"] = env.get(
         "RETAILFLOW_DATASET_VERSION", local.get("RETAILFLOW_DATASET_VERSION", "orders-v3")
     )
+    customer_enabled = env.get(
+        "RETAILFLOW_CUSTOMER_PIPELINE_ENABLED",
+        local.get("RETAILFLOW_CUSTOMER_PIPELINE_ENABLED", "false"),
+    )
+    if customer_enabled not in {"true", "false"}:
+        parser.error("Customer pipeline enablement must be true or false")
+    if customer_enabled == "true" and not (ROOT / ".local-secrets/customer.json").is_file():
+        parser.error("Prepare the local scheduler key file before enabling customer ingestion")
+    env["TF_VAR_customer_pipeline_enabled"] = customer_enabled
+    env["TF_VAR_customer_privacy_key_id"] = env.get(
+        "RETAILFLOW_CUSTOMER_PRIVACY_KEY_ID",
+        local.get("RETAILFLOW_CUSTOMER_PRIVACY_KEY_ID") or "local-v1",
+    )
     if args.action == "init":
         print(terraform(env, "init", "-input=false", "-no-color"))
     elif args.action == "validate":

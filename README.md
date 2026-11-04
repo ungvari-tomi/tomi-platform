@@ -92,7 +92,9 @@ with a keyed pseudonym, and keeps only country and age band. Orders and customer
 retain the same protected join key. This demonstrates data minimization and
 pseudonymization; it does not establish GDPR compliance or true anonymization.
 
-The customer demo is not yet connected to live scheduled ingestion or dbt reporting.
+Airflow integration and three customer dbt models are prepared locally for review.
+The separate customer DAG starts paused; this extension has not yet been deployed.
+See the [customer pipeline integration guide](docs/customer-pipeline.md).
 See [privacy controls and their limits](docs/privacy.md). No real customer data
 should be imported into this demonstration.
 
