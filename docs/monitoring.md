@@ -4,7 +4,7 @@ Current local source: the standalone monitor checks availability/configuration,
 Airflow service health, paused DAGs, the last completed run state and stuck active
 runs. Data freshness checks have moved to [dbt](dbt-freshness.md); this replaces the
 previous Python timestamp, FX-date and successful-run-age rules. The new dbt gate
-and event-driven callbacks are prepared locally and await reviewed deployment.
+and event-driven callbacks were deployed and verified on 2026-11-04.
 
 ```powershell
 .\.venv\Scripts\python.exe -m scripts.monitor

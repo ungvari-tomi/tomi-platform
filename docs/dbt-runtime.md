@@ -1,8 +1,8 @@
 # Terraform-managed dbt Core runtime
 
-[dbt freshness and failure-event email](dbt-freshness.md) adds locally prepared
+[dbt freshness and failure-event email](dbt-freshness.md) adds deployed and verified
 freshness/pipeline actions and current dataset-identity settings. The updated
-runtime images await reviewed deployment; ordinary build retains historical-model
+runtime images were deployed on 2026-11-04; ordinary build retains historical-model
 behavior and does not implicitly execute source freshness.
 
 [Ten-currency generation and EUR valuation](european-currencies.md) are deployed; the versioned migration and live pipelines are verified.

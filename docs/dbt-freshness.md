@@ -1,8 +1,8 @@
 # dbt freshness and failure-event email
 
-Status: implemented and tested locally in disposable storage/containers. Existing
-live DAGs still use the prior image until the saved Terraform plan is approved.
-No live data has been corrupted or live failure notification manufactured.
+Status: deployed locally on 2026-11-04 from source commit 061e068 after owner
+approval of the saved plan. Both live pipelines passed freshness and build checks.
+No live data was corrupted or failure notification manufactured.
 
 ## Gate and contracts
 
@@ -38,7 +38,7 @@ As in dbt generally, ordinary build does not implicitly run source freshness.
 Tagged freshness tests are enabled only for the wrapper freshness/pipeline modes,
 allowing historical model development without wall-clock failures.
 
-## Local commands after image deployment
+## Local commands
 
 ```powershell
 .\scripts\dbt-dev.ps1 freshness
@@ -93,12 +93,23 @@ corruption in disposable storage. The registered callback was invoked from an
 isolated Airflow image over Docker DNS into disposable Mailpit: two failed runs
 produced two emails, a duplicate callback was suppressed, and success/running
 events produced none. This tests registered callback invocation and transport;
-actual scheduler-driven terminal callback dispatch has not yet been demonstrated
-on the updated managed deployment. No deliberate bad-data live test is authorized.
+actual scheduler-driven terminal callback dispatch has not been demonstrated by
+manufacturing a live failure. No deliberate bad-data live test is authorized.
 
-The saved local plan replaces three images and six containers (Airflow services
+The approved local plan replaced three images and six containers (Airflow services
 and initializer, standalone dbt, Mailpit), with no volume/network deletion or orders
-API replacement. Its blob backup verified 882 objects. Deployment requires a
-reviewed commit, owner approval, paused/drained DAGs and a fresh locked warehouse
-snapshot. Existing inbox and warehouse volumes must be preserved. No apply,
-commit/push, paid service or cloud provisioning has been performed for this milestone.
+API replacement. Its initial review verified 882 blobs. Deployment paused/drained
+both DAGs and took a fresh locked warehouse snapshot plus a 1,092-blob backup.
+All seven warehouse table schemas/row checksums matched after apply; the existing
+inbox message and protected services were preserved. Only the processor joined
+the Mailpit network. The post-apply Terraform plan reported no changes.
+
+Controlled run dbt_freshness_deployment_20261104T061102Z succeeded in both DAGs:
+all six tasks passed on attempt 1; each pipeline passed two source-freshness checks,
+two freshness tests, three models and 37 existing data tests. Independent final
+snapshot checks preserved every historical raw, membership and ledger row, with
+orders increasing from 569 to 570 and FX records remaining 19. Both schedules are
+enabled. Successful runs generated no emails, and all 1,092 backed-up blobs still
+matched afterward. Full hosted CI passed for the source commit. Deployment evidence
+is retained under ignored artifacts/deployment-dbt-freshness-20261104/deployment.json.
+No paid service or cloud infrastructure was provisioned.

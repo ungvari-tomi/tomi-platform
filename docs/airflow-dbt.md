@@ -1,7 +1,7 @@
 # Airflow dbt builds and data tests
 
-[dbt freshness and failure-event email](dbt-freshness.md) is prepared locally and
-awaits deployment. It supersedes the single-build launcher below with a locked
+[dbt freshness and failure-event email](dbt-freshness.md) was deployed on 2026-11-04.
+It supersedes the single-build launcher below with a locked
 source-freshness -> freshness-tests -> build pipeline and a 450-second parent
 timeout. The new current source passes only dataset identity settings in addition
 to the existing credential-free child environment, and retains each phase's artifacts.

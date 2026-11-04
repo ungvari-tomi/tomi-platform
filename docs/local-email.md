@@ -1,8 +1,8 @@
 # Local alert inbox
 
-The [dbt freshness/failure-event milestone](dbt-freshness.md) is prepared locally
-and supersedes the former polling/reminder/recovery sender described in the first
-inbox deployment. Its Airflow image/route update awaits review. Only terminal DAG
+The [dbt freshness/failure-event milestone](dbt-freshness.md) was deployed on
+2026-11-04 and supersedes the former polling/reminder/recovery sender from the first
+inbox deployment. Its Airflow image/route update is verified. Only terminal DAG
 failure events will send automatic mail; no periodic email schedule is planned.
 
 Status: deployed locally on 2026-11-03 after owner approval of the saved plan.
@@ -109,5 +109,8 @@ The final post-apply plan reports no changes and its fresh blob backup verified
 876 objects. Terraform explicitly matches the image's inherited one-second health
 start interval, avoiding repeated drift. No additional apply was needed for that
 declaration. The inbox and ordinary monitor-to-inbox invocation are both healthy.
-Next milestone: review/deploy the prepared dbt freshness gate and terminal-failure
-callbacks. The earlier ten-minute host email-schedule proposal is cancelled.
+The dbt gate and terminal-failure callbacks are deployed. Both controlled pipeline
+runs passed all phases without generating email; the existing inbox message remained
+present. Failure delivery was tested with isolated callback invocation and disposable
+Mailpit, rather than manufacturing a failed live run. The earlier ten-minute host
+email-schedule proposal is cancelled.
