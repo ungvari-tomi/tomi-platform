@@ -121,3 +121,13 @@ schema migration and activation remain unperformed.
 This final plan supersedes the earlier review directory without deleting it.
 The scheduler UID read-access check passed, and Windows ACL inspection found
 only owner, system and administrator allow entries on the prepared key file.
+
+Hosted CI exposed Linux ownership differences in host-created temporary bind
+mounts. The two customer container checks now use anonymous disposable Docker
+volumes for writable warehouse/artifact/log storage. A narrowly scoped initializer
+sets only the copied fixture's ownership and modes (group 10001, directory 2770,
+file 0660); dbt and Airflow checks still run as UID 10001 and UID 50000 respectively.
+The tests assert these Linux identities and permissions. Source/model mounts stay
+read-only, the volumes are removed after use, and no live volume is attached.
+Both previously failing tests passed locally after this correction (176.33 seconds);
+the hosted CI rerun remains pending publication of the fix.

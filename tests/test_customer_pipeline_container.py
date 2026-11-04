@@ -1,9 +1,11 @@
 """Exercise the real Airflow SDK and isolated dbt against disposable masked data."""
 
-import json
 import os
 import subprocess
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
+from uuid import uuid4
 
 import duckdb
 import pytest
@@ -15,17 +17,71 @@ from retailflow.customer_ingestion import extract_private, load_private
 from retailflow.privacy import PrivacyKey
 
 
+@contextmanager
+def disposable_warehouse(database: Path) -> Iterator[str]:
+    """Copy only this test fixture into an owned Linux volume; never mount live data."""
+    owner = "customer-fixture-" + uuid4().hex
+
+    def docker(*args):
+        result = subprocess.run(["docker", *args], capture_output=True, text=True, timeout=60)
+        assert result.returncode == 0, result.stdout + result.stderr
+        return result.stdout
+
+    try:
+        # Initialization alone runs as root, with limited capabilities and no network.
+        # Workload containers below keep their deployed non-root identities.
+        docker(
+            "create",
+            "--name",
+            owner,
+            "--network",
+            "none",
+            "--read-only",
+            "--user",
+            "0:0",
+            "--cap-drop",
+            "ALL",
+            "--cap-add",
+            "CHOWN",
+            "--cap-add",
+            "FOWNER",
+            "--cap-add",
+            "DAC_OVERRIDE",
+            "--cap-add",
+            "FSETID",
+            "--security-opt",
+            "no-new-privileges:true",
+            "--mount",
+            "type=volume,target=/warehouse",
+            "--entrypoint",
+            "python",
+            "retailflow-duckdb:validation",
+            "-c",
+            "import os; from pathlib import Path; "
+            "p=Path('/warehouse/retailflow.duckdb'); "
+            "os.chown(p,10001,10001); p.chmod(0o660); "
+            "os.chown(p.parent,10001,10001); p.parent.chmod(0o2770)",
+        )
+        docker("cp", str(database), owner + ":/warehouse/retailflow.duckdb")
+        docker("start", "--attach", owner)
+        yield owner
+    finally:
+        result = subprocess.run(
+            ["docker", "rm", "--force", "--volumes", owner],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.returncode and "No such container" not in result.stderr:
+            raise RuntimeError("Disposable customer fixture cleanup failed")
+
+
 @pytest.mark.skipif(
     os.environ.get("RETAILFLOW_TEST_AIRFLOW_IMAGE") != "1",
     reason="Opt in to local validation images",
 )
 def test_default_dbt_parse_excludes_customer_models_and_generated_tests(tmp_path):
     root = Path(__file__).resolve().parents[1]
-    warehouse = tmp_path / "warehouse"
-    artifacts = tmp_path / "artifacts"
-    warehouse.mkdir()
-    artifacts.mkdir()
-    duckdb.connect(str(warehouse / "retailflow.duckdb")).close()
     command = [
         "docker",
         "run",
@@ -41,8 +97,6 @@ def test_default_dbt_parse_excludes_customer_models_and_generated_tests(tmp_path
         "no-new-privileges:true",
     ]
     for source, target, readonly in [
-        (warehouse, "/warehouse", False),
-        (artifacts, "/artifacts", False),
         (root / "infra/dbt/project", "/app/project", True),
         (root / "infra/dbt/run.py", "/app/run.py", True),
     ]:
@@ -50,18 +104,38 @@ def test_default_dbt_parse_excludes_customer_models_and_generated_tests(tmp_path
             "--mount",
             f"type=bind,source={source},target={target}" + (",readonly" if readonly else ""),
         ]
+    command += [
+        "--mount",
+        "type=volume,target=/warehouse",
+        "--mount",
+        "type=volume,target=/artifacts",
+        "--entrypoint",
+        "python",
+    ]
+    script = """
+import json, os
+from pathlib import Path
+import duckdb
+from run import execute
+assert os.getuid() == 10001
+path=Path('/warehouse/retailflow.duckdb')
+duckdb.connect(str(path)).close()
+assert execute('parse',path,Path('/artifacts')) == 0
+manifest=json.loads(next(Path('/artifacts').glob('*/target/manifest.json')).read_text())
+models=[r['name'] for r in manifest['nodes'].values() if r['resource_type']=='model']
+tests=[r for r in manifest['nodes'].values() if r['resource_type']=='test']
+assert set(models)=={'stg_orders','stg_exchange_rates','orders_eur'}
+assert len(tests)==37
+print('PASS: default build excludes customer resources')
+"""
     result = subprocess.run(
-        [*command, "retailflow-dbt:validation", "parse"],
+        [*command, "retailflow-dbt:validation", "-c", script],
         capture_output=True,
         text=True,
         timeout=120,
     )
     assert result.returncode == 0, result.stdout + result.stderr
-    manifest = json.loads(next(artifacts.glob("*/target/manifest.json")).read_text())
-    models = [row["name"] for row in manifest["nodes"].values() if row["resource_type"] == "model"]
-    tests = [row for row in manifest["nodes"].values() if row["resource_type"] == "test"]
-    assert set(models) == {"stg_orders", "stg_exchange_rates", "orders_eur"}
-    assert len(tests) == 37
+    assert "PASS: default build excludes customer resources" in result.stdout
 
 
 @pytest.mark.skipif(
@@ -80,14 +154,18 @@ def test_real_customer_pipeline_and_deliberate_corruption(tmp_path):
             store, client, tmp_path / "state", "fixture", PrivacyKey(bytes(range(32))), limit=20
         )
     load_private(store, manifest, database)
-    logs = tmp_path / "logs"
-    logs.mkdir()
     script = r"""
 import json, os, runpy, subprocess
 from pathlib import Path
 import duckdb
 from filelock import FileLock
 from retailflow.transformation import scheduled_build
+
+assert os.getuid()==50000 and 10001 in os.getgroups()
+warehouse=Path('/warehouse')
+assert warehouse.stat().st_gid==10001
+assert warehouse.stat().st_mode & 0o7777 == 0o2770
+assert (warehouse/'retailflow.duckdb').stat().st_mode & 0o777 == 0o660
 
 namespace=runpy.run_path('/opt/airflow/dags/retailflow_extraction.py')
 workflow=namespace['customers']()
@@ -174,8 +252,6 @@ print('PASS customer pipeline, paused DAG, private child environment and 4 corru
         "RETAILFLOW_DBT_ARTIFACT_DIR=/opt/airflow/logs/customer-dbt",
     ]
     mounts = [
-        (warehouse, "/warehouse", False),
-        (logs, "/opt/airflow/logs", False),
         (root / "infra/dbt/project", "/opt/dbt/project", True),
         (root / "infra/dbt/run.py", "/opt/dbt/run.py", True),
         (
@@ -192,6 +268,9 @@ print('PASS customer pipeline, paused DAG, private child environment and 4 corru
             f"type=bind,source={source},target={target}" + (",readonly" if readonly else ""),
         ]
     command += ["--entrypoint", "python", "retailflow-airflow:validation", "-c", script]
-    result = subprocess.run(command, capture_output=True, text=True, timeout=300)
-    assert result.returncode == 0, result.stdout + result.stderr
-    assert "4 corruptions" in result.stdout
+    with disposable_warehouse(database) as owner:
+        # Docker initializes the logs volume from the image's scheduler-owned directory.
+        command[2:2] = ["--volumes-from", owner, "--mount", "type=volume,target=/opt/airflow/logs"]
+        result = subprocess.run(command, capture_output=True, text=True, timeout=300)
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert "4 corruptions" in result.stdout
