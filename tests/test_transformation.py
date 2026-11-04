@@ -14,8 +14,8 @@ def test_build_sanitizes_environment_and_returns_small_summary(monkeypatch, tmp_
     monkeypatch.setenv("PYTHONPATH", "must-not-enter-dbt")
 
     def execute(command, *, env, check, timeout):
-        assert command == ["/opt/dbt/venv/bin/python", "-I", "/opt/dbt/run.py", "build"]
-        assert check is True and timeout == 150
+        assert command == ["/opt/dbt/venv/bin/python", "-I", "/opt/dbt/run.py", "pipeline"]
+        assert check is True and timeout == 450
         assert "AIRFLOW_DB_PASSWORD" not in env and "PYTHONPATH" not in env
         assert env["PYTHONNOUSERSITE"] == "1"
         target = Path(env["RETAILFLOW_DBT_ARTIFACT_DIR"]) / "invocation/target"
@@ -30,6 +30,13 @@ def test_build_sanitizes_environment_and_returns_small_summary(monkeypatch, tmp_
                 }
             )
         )
+        for phase, filename in [
+            ("source_freshness", "sources.json"),
+            ("freshness_tests", "run_results.json"),
+        ]:
+            path = target.parent / phase / "target"
+            path.mkdir(parents=True)
+            (path / filename).write_text(json.dumps({"results": [{"status": "pass"}] * 2}))
         return SimpleNamespace(returncode=0)
 
     monkeypatch.setattr(transformation.subprocess, "run", execute)

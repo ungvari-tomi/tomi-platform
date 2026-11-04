@@ -4,6 +4,8 @@ from datetime import UTC, datetime, timedelta
 
 from airflow.sdk import dag, get_current_context, task
 
+from retailflow.alerts import dag_failure
+
 
 def requested_rate_date(interval_end: datetime | None, run_after: datetime) -> str:
     """Manual Airflow 3 runs have no interval; use their stable recorded queue time."""
@@ -17,6 +19,7 @@ def requested_rate_date(interval_end: datetime | None, run_after: datetime) -> s
     catchup=False,
     max_active_runs=1,
     is_paused_upon_creation=True,
+    on_failure_callback=dag_failure,
     default_args={
         "retries": 2,
         "retry_delay": timedelta(seconds=30),
@@ -56,6 +59,7 @@ def orders():
     catchup=False,
     max_active_runs=1,
     is_paused_upon_creation=True,
+    on_failure_callback=dag_failure,
     default_args={
         "retries": 2,
         "retry_delay": timedelta(minutes=1),

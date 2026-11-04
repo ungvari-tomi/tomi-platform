@@ -1,5 +1,10 @@
 # Local alert inbox
 
+The [dbt freshness/failure-event milestone](dbt-freshness.md) is prepared locally
+and supersedes the former polling/reminder/recovery sender described in the first
+inbox deployment. Its Airflow image/route update awaits review. Only terminal DAG
+failure events will send automatic mail; no periodic email schedule is planned.
+
 Status: deployed locally on 2026-11-03 after owner approval of the saved plan.
 The managed inbox is healthy; a synthetic test message was captured and its body
 verified through the inbox API. The normal monitoring command returned OK/no alerts.
@@ -49,39 +54,40 @@ off-host backup or a durability guarantee.
 .\.venv\Scripts\python.exe -m scripts.monitor_mail --test-email
 
 # Run read-only monitoring and capture any new alerts locally.
-.\.venv\Scripts\python.exe -m scripts.monitor_mail
+# Automatic delivery is the DAG-level failure callback after deployment.
 
 # Check/report only, without sending or advancing notification state.
 .\.venv\Scripts\python.exe -m scripts.monitor_mail --dry-run
 ```
 
-The normal command invokes the existing monitor and sends a message when alerts
-first appear or their component/code/severity changes. Unchanged alerts are
-suppressed for six hours, then reminded. Recovery is emailed only after a previously
-emailed incident clears; an initially healthy platform produces no email. The
-test-email option does not modify incident state.
+The sender now requires --test-email or --dry-run for explicit diagnostics. With
+neither option it refuses to run, preventing an old polling invocation from sending
+mail. Automatic delivery is registered only at DAG level for terminal failed runs.
+Success, running/retry states, reminders and recovery do not send messages. The
+test-email option does not modify failure receipts.
 
-Messages contain codes, component names, severity and check time only. Full probe
+Failure messages contain the allowlisted DAG name, a hashed event identity and time. Full probe
 observations, credentials, tokens, dataset records, SQL, logs and exception text
-are excluded. The sender hardcodes loopback SMTP and the synthetic addresses;
+are excluded. Diagnostic SMTP uses loopback; the DAG processor uses the approved
+Docker-local retailflow-mailpit service and alone joins that inbox network. Both
+routes hardcode the synthetic addresses;
 there is no external SMTP host, login or recipient configuration. It never calls
 an external email service. The UI's link-check features/browser links are not a
 network isolation guarantee; use this inbox for synthetic operational messages.
 
 Reports and delivery events are retained under ignored artifacts/monitoring.
-The locked mail-state.json contains only alert fingerprints and send timestamps.
-Delivery state is atomically advanced after SMTP acceptance, so a failed send
-can retry on the next invocation. SMTP acceptance is not proof that a person read
-the inbox; a crash after acceptance but before state publication can cause a
-duplicate. Corrupt/unrecognized state fails visibly rather than silently resetting.
-Exit codes 0/1/2 preserve monitor outcomes; 3 means monitoring/delivery could not
-complete. Events report exception types only. No retry loop or automatic schedule
-is introduced by running this command.
+Old mail-state.json is retained but unused. Per-failed-run receipts are now stored
+under the protected Airflow logs volume, after SMTP acceptance, with a common event
+lock and stable Message-ID. Mailpit duplicate-ID suppression adds protection for
+callback replay. This is not exactly-once delivery or a durable outbox: callback
+SMTP failure is visible in processor logs and may need explicit replay. No raw
+exception text is logged. Explicit diagnostics keep monitor exit codes and use 3
+for unavailable delivery; they never schedule emails or reset failed runs.
 
 ## Data ownership and verification
 
 The repository owner owns this synthetic internal operational dataset. Lineage is
-the existing read-only monitor -> filtered email -> Mailpit SQLite database.
+Airflow terminal DAG-failure event -> filtered email -> Mailpit SQLite database.
 Approved use is local development/troubleshooting. Retention is manual; deletion
 is an explicit owner UI action. Do not store real customer data or credentials in
 messages. Nothing from the inbox volume or notification state enters Git/delivery.
@@ -103,5 +109,5 @@ The final post-apply plan reports no changes and its fresh blob backup verified
 876 objects. Terraform explicitly matches the image's inherited one-second health
 start interval, avoiding repeated drift. No additional apply was needed for that
 declaration. The inbox and ordinary monitor-to-inbox invocation are both healthy.
-Next milestone: a reviewed Terraform-managed ten-minute host schedule independent
-of Airflow.
+Next milestone: review/deploy the prepared dbt freshness gate and terminal-failure
+callbacks. The earlier ten-minute host email-schedule proposal is cancelled.

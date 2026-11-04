@@ -1,5 +1,4 @@
 import json
-from copy import deepcopy
 from datetime import UTC, datetime, timedelta
 
 import duckdb
@@ -16,10 +15,7 @@ NOW = datetime(2026, 11, 2, 12, tzinfo=UTC)
 def observations():
     return {
         "source": {"latest_available_at": NOW.isoformat(), **monitor.Config().identity()},
-        "warehouse": {
-            "latest_order_at": (NOW - timedelta(minutes=10)).isoformat(),
-            "fx_dates": {quote: "2026-10-30" for quote in monitor.FX_QUOTES},
-        },
+        "warehouse": {"status": "ok"},
         "airflow": {
             "health": {key: "healthy" for key in ["metadatabase", "scheduler", "dag_processor"]},
             "dags": {
@@ -35,45 +31,6 @@ def observations():
     }
 
 
-def test_healthy_weekend_rates_do_not_follow_order_interval(observations):
-    observations["airflow"]["dags"]["retailflow_exchange_rates"]["last_success_at"] = (
-        NOW - timedelta(hours=25)
-    ).isoformat()
-    report = monitor.evaluate(observations, monitor.Config(), NOW)
-    assert report["exit_code"] == 0 and report["alerts"] == []
-
-
-def test_stale_source_and_current_dataset_orders_are_separate_alerts(observations):
-    observations["source"]["latest_available_at"] = (NOW - timedelta(minutes=21)).isoformat()
-    observations["warehouse"]["latest_order_at"] = (NOW - timedelta(minutes=31)).isoformat()
-    report = monitor.evaluate(observations, monitor.Config(), NOW)
-    assert report["exit_code"] == 1
-    assert {(item["component"], item["code"]) for item in report["alerts"]} == {
-        ("source", "STALE"),
-        ("warehouse.orders", "STALE"),
-    }
-
-
-@pytest.mark.parametrize(
-    "published,code",
-    [
-        ("2026-10-25", "STALE_RATE"),
-        ("2026-11-03", "FUTURE_TIMESTAMP"),
-        (None, "NO_SUCCESS_OR_DATA"),
-    ],
-)
-def test_fx_missing_stale_and_future_dates(observations, published, code):
-    if published:
-        observations["warehouse"]["fx_dates"]["HUF"] = published
-    else:
-        del observations["warehouse"]["fx_dates"]["HUF"]
-    report = monitor.evaluate(observations, monitor.Config(), NOW)
-    assert any(
-        item["component"] == "warehouse.fx.HUF" and item["code"] == code
-        for item in report["alerts"]
-    )
-
-
 def test_paused_failed_stuck_and_missing_success_are_visible(observations):
     dag = observations["airflow"]["dags"]["retailflow_orders"]
     dag.update(
@@ -87,27 +44,8 @@ def test_paused_failed_stuck_and_missing_success_are_visible(observations):
     assert {item["code"] for item in report["alerts"]} == {
         "DAG_PAUSED",
         "LATEST_RUN_FAILED",
-        "NO_SUCCESS_OR_DATA",
         "RUN_STUCK",
     }
-
-
-def test_daily_fx_pipeline_and_publication_dates_use_different_thresholds(observations):
-    observations["airflow"]["dags"]["retailflow_exchange_rates"]["last_success_at"] = (
-        NOW - timedelta(hours=31)
-    ).isoformat()
-    report = monitor.evaluate(observations, monitor.Config(), NOW)
-    assert report["alerts"] == [
-        {"component": "retailflow_exchange_rates", "code": "STALE", "severity": "warning"}
-    ]
-
-
-@pytest.mark.parametrize("timestamp", ["2026-11-02T12:00:00", "invalid"])
-def test_invalid_timestamp_fails_closed(observations, timestamp):
-    observations["warehouse"]["latest_order_at"] = timestamp
-    report = monitor.evaluate(observations, monitor.Config(), NOW)
-    assert report["exit_code"] == 2
-    assert report["alerts"][0]["code"] == "INVALID_PROBE_DATA"
 
 
 def test_source_identity_mismatch_and_unhealthy_scheduler_are_critical(observations):
@@ -138,11 +76,11 @@ def test_monitor_rejects_non_loopback_origins_and_credential_urls(value):
 
 def test_configuration_environment_overrides_working_directory_dotenv(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
-    (tmp_path / ".env").write_text("RETAILFLOW_MONITOR_ORDERS_MAX_AGE_SECONDS=2400\n")
-    monkeypatch.setenv("RETAILFLOW_MONITOR_ORDERS_MAX_AGE_SECONDS", "3600")
-    assert monitor.Config.load().orders_max_age == 3600
-    monkeypatch.delenv("RETAILFLOW_MONITOR_ORDERS_MAX_AGE_SECONDS")
-    assert monitor.Config.load().orders_max_age == 2400
+    (tmp_path / ".env").write_text("RETAILFLOW_MONITOR_RUN_MAX_AGE_SECONDS=2400\n")
+    monkeypatch.setenv("RETAILFLOW_MONITOR_RUN_MAX_AGE_SECONDS", "3600")
+    assert monitor.Config.load().run_max_age == 3600
+    monkeypatch.delenv("RETAILFLOW_MONITOR_RUN_MAX_AGE_SECONDS")
+    assert monitor.Config.load().run_max_age == 2400
     # Synthetic test value used only to verify credential redaction.
     # pragma: allowlist nextline secret
     assert "private-value" not in repr(monitor.Config(password="private-value"))
@@ -222,13 +160,9 @@ def warehouse(tmp_path):
 
 def test_locked_warehouse_probe_reads_only_current_identity_and_preserves_records(warehouse):
     original = warehouse.read_bytes()
-    data = monitor_warehouse.collect(warehouse, monitor.Config().identity())
-    assert data["latest_order_at"].startswith("2026-11-02T12:00:00")
-    assert data["fx_dates"] == {"HUF": "2026-10-30"}
+    data = monitor_warehouse.collect(warehouse)
+    assert data == {"status": "ok"}
     assert warehouse.read_bytes() == original
-    other = deepcopy(monitor.Config().identity())
-    other["seed"] = 99
-    assert monitor_warehouse.collect(warehouse, other)["latest_order_at"] is None
 
 
 def test_warehouse_probe_respects_existing_writer_lock(monkeypatch, warehouse):
@@ -239,13 +173,13 @@ def test_warehouse_probe_respects_existing_writer_lock(monkeypatch, warehouse):
     )
     with FileLock(str(warehouse) + ".lock", mode=0o660):
         with pytest.raises(Timeout):
-            monitor_warehouse.collect(warehouse, monitor.Config().identity())
+            monitor_warehouse.collect(warehouse)
 
 
 def test_probe_never_initializes_an_absent_warehouse(tmp_path):
     path = tmp_path / "absent.duckdb"
     with pytest.raises(FileNotFoundError):
-        monitor_warehouse.collect(path, monitor.Config().identity())
+        monitor_warehouse.collect(path)
     assert not path.exists()
 
 
@@ -256,12 +190,6 @@ def test_busy_warehouse_is_not_reported_as_healthy_or_unavailable(observations):
     assert report["alerts"] == [
         {"component": "warehouse", "code": "WAREHOUSE_BUSY", "severity": "warning"}
     ]
-
-
-@pytest.mark.parametrize("age,code", [(1800, 0), (1801, 1), (-60, 0), (-61, 2)])
-def test_order_freshness_boundaries_and_clock_tolerance(observations, age, code):
-    observations["warehouse"]["latest_order_at"] = (NOW - timedelta(seconds=age)).isoformat()
-    assert monitor.evaluate(observations, monitor.Config(), NOW)["exit_code"] == code
 
 
 def test_authentication_redirect_is_not_followed(monkeypatch):
@@ -311,3 +239,11 @@ def test_report_files_are_unique_and_exclude_credentials(monkeypatch, tmp_path, 
     assert len(files) == 2
     assert all("private-value" not in path.read_text() for path in files)
     assert "private-value" not in capsys.readouterr().out
+
+
+def test_data_freshness_is_not_reimplemented_in_health_monitor(observations):
+    observations["source"]["latest_available_at"] = "2000-01-01T00:00:00Z"
+    observations["warehouse"]["latest_order_at"] = "2000-01-01T00:00:00Z"
+    for dag in observations["airflow"]["dags"].values():
+        dag["last_success_at"] = "2000-01-01T00:00:00Z"
+    assert monitor.evaluate(observations, monitor.Config(), NOW)["exit_code"] == 0

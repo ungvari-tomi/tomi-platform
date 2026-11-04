@@ -5,9 +5,25 @@ sources:
     description: Checksum-verified source batches loaded by Python; synthetic orders and public ECB rates.
     tables:
       - name: orders
+        config:
+          loaded_at_field: created_at
+          freshness:
+            error_after: {count: 30, period: minute}
+            filter: >-
+              dataset_id in (select dataset_id from ops.datasets
+              where dataset_version = '{{ env_var("RETAILFLOW_DATASET_VERSION", "orders-v3") | replace("'", "''") }}'
+              and seed = {{ env_var("RETAILFLOW_SEED", "42") | int }}
+              and interval_seconds = {{ env_var("RETAILFLOW_INTERVAL_SECONDS", "600") | int }})
       - name: exchange_rates
   - name: retailflow_ops
     schema: ops
     description: Verified date-specific FX request lineage maintained by the transactional loader.
     tables:
       - name: fx_batch_records
+      - name: datasets
+      - name: loaded_batches
+        config:
+          loaded_at_field: loaded_at
+          freshness:
+            error_after: {count: 30, period: hour}
+            filter: source = 'exchange-rates'

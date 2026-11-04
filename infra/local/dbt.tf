@@ -37,6 +37,9 @@ resource "docker_container" "dbt" {
     "RETAILFLOW_DUCKDB_PATH=/warehouse/retailflow.duckdb",
     "RETAILFLOW_DBT_ARTIFACT_DIR=/artifacts",
     "DBT_SEND_ANONYMOUS_USAGE_STATS=false",
+    "RETAILFLOW_DATASET_VERSION=${var.orders_dataset_version}",
+    "RETAILFLOW_SEED=${var.orders_seed}",
+    "RETAILFLOW_INTERVAL_SECONDS=${var.orders_interval_seconds}",
   ]
   mounts {
     target = "/warehouse"

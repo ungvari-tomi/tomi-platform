@@ -37,12 +37,15 @@ def scheduled_build(dag_id: str, run_id: str, try_number: int) -> dict:
         ),
         "RETAILFLOW_DBT_ARTIFACT_DIR": str(directory),
         "DBT_SEND_ANONYMOUS_USAGE_STATS": "false",
+        "RETAILFLOW_DATASET_VERSION": os.environ.get("RETAILFLOW_DATASET_VERSION", "orders-v3"),
+        "RETAILFLOW_SEED": os.environ.get("RETAILFLOW_SEED", "42"),
+        "RETAILFLOW_INTERVAL_SECONDS": os.environ.get("RETAILFLOW_INTERVAL_SECONDS", "600"),
     }
     subprocess.run(  # nosec B603
-        ["/opt/dbt/venv/bin/python", "-I", "/opt/dbt/run.py", "build"],
+        ["/opt/dbt/venv/bin/python", "-I", "/opt/dbt/run.py", "pipeline"],
         env=environment,
         check=True,
-        timeout=150,
+        timeout=450,
     )
     results = list(directory.glob("*/target/run_results.json"))
     if len(results) != 1:
@@ -50,8 +53,20 @@ def scheduled_build(dag_id: str, run_id: str, try_number: int) -> dict:
     records = json.loads(results[0].read_text(encoding="utf-8"))["results"]
     if not records or any(row["status"] not in ("pass", "success") for row in records):
         raise RuntimeError("dbt results include failed, skipped, or empty outcomes")
+    for phase, filename in [
+        ("source_freshness", "sources.json"),
+        ("freshness_tests", "run_results.json"),
+    ]:
+        paths = list(directory.glob(f"*/{phase}/target/{filename}"))
+        if len(paths) != 1:
+            raise RuntimeError("Missing dbt freshness evidence")
+        checks = json.loads(paths[0].read_text(encoding="utf-8"))["results"]
+        if len(checks) != 2 or any(row["status"] != "pass" for row in checks):
+            raise RuntimeError("dbt freshness checks did not all pass")
     return {
         "artifact_directory": str(directory),
         "models_succeeded": sum(row["unique_id"].startswith("model.") for row in records),
         "tests_passed": sum(row["unique_id"].startswith("test.") for row in records),
+        "freshness_sources_passed": 2,
+        "freshness_tests_passed": 2,
     }

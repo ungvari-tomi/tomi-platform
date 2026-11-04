@@ -9,7 +9,7 @@ import shutil
 # Fixed Docker command, no shell; captured output is never included in alerts.
 import subprocess  # nosec B404
 from dataclasses import dataclass, field
-from datetime import UTC, date, datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import urlsplit
 from uuid import uuid4
@@ -17,7 +17,7 @@ from uuid import uuid4
 import httpx
 from dotenv import dotenv_values
 
-from retailflow.currencies import FX_QUOTES, SUPPORTED_DATASETS
+from retailflow.currencies import SUPPORTED_DATASETS
 
 ROOT = Path(__file__).resolve().parents[1]
 DAGS = {"retailflow_orders": "orders", "retailflow_exchange_rates": "fx"}
@@ -55,8 +55,6 @@ class Config:
     dataset_version: str = "orders-v3"
     seed: int = 42
     interval_seconds: int = 600
-    orders_max_age: int = 1800
-    fx_max_age: int = 108000
     run_max_age: int = 1800
 
     @classmethod
@@ -74,17 +72,12 @@ class Config:
             dataset_version=value("RETAILFLOW_DATASET_VERSION", "orders-v3"),
             seed=int(value("RETAILFLOW_SEED", "42")),
             interval_seconds=int(value("RETAILFLOW_INTERVAL_SECONDS", "600")),
-            orders_max_age=int(value("RETAILFLOW_MONITOR_ORDERS_MAX_AGE_SECONDS", "1800")),
-            fx_max_age=int(value("RETAILFLOW_MONITOR_FX_MAX_AGE_SECONDS", "108000")),
             run_max_age=int(value("RETAILFLOW_MONITOR_RUN_MAX_AGE_SECONDS", "1800")),
         )
         if (
             config.dataset_version not in SUPPORTED_DATASETS
             or not 1 <= config.interval_seconds <= 3600
-            or any(
-                not 1 <= threshold <= 604800
-                for threshold in (config.orders_max_age, config.fx_max_age, config.run_max_age)
-            )
+            or not 1 <= config.run_max_age <= 604800
         ):
             raise ValueError("Invalid monitoring configuration")
         return config
@@ -104,10 +97,7 @@ def source_probe(config: Config) -> dict:
         response = client.get("/v1/orders", params={"limit": 1})
         response.raise_for_status()
         page = response.json()
-    return {
-        key: page[key]
-        for key in ("latest_available_at", "dataset_version", "seed", "interval_seconds")
-    }
+    return {key: page[key] for key in ("dataset_version", "seed", "interval_seconds")}
 
 
 def airflow_probe(config: Config) -> dict:
@@ -142,12 +132,10 @@ def airflow_probe(config: Config) -> dict:
                     ],
                 )["dag_runs"]
 
-            success = runs(["success"], "-end_date")
             completed = runs(["success", "failed"], "-end_date")
             active = runs(["queued", "running"], "run_after")
             dags[dag] = {
                 "paused": get(path)["is_paused"],
-                "last_success_at": success[0]["end_date"] if success else None,
                 "latest_completed_state": completed[0]["state"] if completed else None,
                 "oldest_active_at": active[0]["run_after"] if active else None,
             }
@@ -172,7 +160,6 @@ def warehouse_probe(config: Config) -> dict:
             "retailflow-duckdb",
             "python",
             "-",
-            json.dumps(config.identity()),
         ],
         input=script,
         capture_output=True,
@@ -198,16 +185,6 @@ def evaluate(observations: dict, config: Config, now: datetime) -> dict:
     def alert(component: str, code: str, severity: str = "warning") -> None:
         alerts.append({"component": component, "code": code, "severity": severity})
 
-    def freshness(component: str, value: str | None, limit: int) -> None:
-        if value is None:
-            alert(component, "NO_SUCCESS_OR_DATA")
-            return
-        age = (now - timestamp(value)).total_seconds()
-        if age < -60:
-            alert(component, "FUTURE_TIMESTAMP", "critical")
-        elif age > limit:
-            alert(component, "STALE")
-
     for component in ("source", "airflow", "warehouse"):
         data = observations[component]
         if "error_type" in data:
@@ -217,33 +194,20 @@ def evaluate(observations: dict, config: Config, now: datetime) -> dict:
             if component == "source":
                 if any(data[key] != value for key, value in config.identity().items()):
                     alert(component, "SOURCE_CONFIGURATION_MISMATCH", "critical")
-                freshness(component, data["latest_available_at"], config.interval_seconds * 2)
             elif component == "warehouse":
                 if data.get("status") == "busy":
                     alert(component, "WAREHOUSE_BUSY")
                     continue
-                freshness("warehouse.orders", data["latest_order_at"], config.orders_max_age)
-                for quote in FX_QUOTES:
-                    published = data["fx_dates"].get(quote)
-                    name = "warehouse.fx." + quote
-                    if published is None:
-                        alert(name, "NO_SUCCESS_OR_DATA")
-                    else:
-                        days = (now.date() - date.fromisoformat(published)).days
-                        if days < 0:
-                            alert(name, "FUTURE_TIMESTAMP", "critical")
-                        elif days > 7:
-                            alert(name, "STALE_RATE")
+                if data.get("status") != "ok":
+                    alert(component, "UNHEALTHY", "critical")
             else:
                 for name in ("metadatabase", "scheduler", "dag_processor"):
                     if data["health"][name] != "healthy":
                         alert("airflow." + name, "UNHEALTHY", "critical")
-                for dag, kind in DAGS.items():
+                for dag in DAGS:
                     details = data["dags"][dag]
                     if details["paused"]:
                         alert(dag, "DAG_PAUSED")
-                    limit = config.orders_max_age if kind == "orders" else config.fx_max_age
-                    freshness(dag, details["last_success_at"], limit)
                     if details["latest_completed_state"] == "failed":
                         alert(dag, "LATEST_RUN_FAILED", "critical")
                     if details["oldest_active_at"]:
@@ -260,11 +224,7 @@ def evaluate(observations: dict, config: Config, now: datetime) -> dict:
         "alerts": alerts,
         "observations": observations,
         "thresholds": {
-            "orders_seconds": config.orders_max_age,
-            "fx_pipeline_seconds": config.fx_max_age,
             "active_run_seconds": config.run_max_age,
-            "source_seconds": config.interval_seconds * 2,
-            "fx_publication_days": 7,
         },
     }
 

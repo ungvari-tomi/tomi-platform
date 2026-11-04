@@ -43,6 +43,29 @@ def test_dbt_refuses_missing_warehouse_and_respects_loader_lock(monkeypatch, tmp
             run.execute("check", database, tmp_path / "artifacts", lock_timeout=0)
 
 
+@pytest.mark.parametrize("failure_at", [0, 1])
+def test_freshness_failure_stops_pipeline_before_build_under_common_lock(
+    monkeypatch, tmp_path, failure_at
+):
+    database = tmp_path / "retailflow.duckdb"
+    database.write_bytes(b"fixture")
+    monkeypatch.setattr(run.shutil, "which", lambda _: "dbt")
+    calls = []
+
+    def execute(command, **kwargs):
+        with pytest.raises(Timeout):
+            FileLock(str(database) + ".lock", mode=0o660).acquire(timeout=0)
+        assert str(database.resolve()) == kwargs["env"]["RETAILFLOW_DUCKDB_PATH"]
+        calls.append((command, kwargs["env"]["DBT_TARGET_PATH"]))
+        return SimpleNamespace(returncode=1 if len(calls) - 1 == failure_at else 0)
+
+    monkeypatch.setattr(run.subprocess, "run", execute)
+    assert run.execute("pipeline", database, tmp_path / "artifacts") == 1
+    assert len(calls) == failure_at + 1
+    assert not any(command[1] == "build" for command, _ in calls)
+    assert len({path for _, path in calls}) == len(calls)
+
+
 def test_dbt_lock_matches_shared_duckdb_version_and_export_hashes():
     root = Path(__file__).resolve().parents[1]
     dbt = tomllib.loads((root / "infra/dbt/uv.lock").read_text(encoding="utf-8"))

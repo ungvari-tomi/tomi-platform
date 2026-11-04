@@ -18,6 +18,15 @@ def execute(action: str, database: Path, artifact_root: Path, *, lock_timeout: f
         "check": [["debug", "--connection"], ["run-operation", "runtime_check"]],
         "parse": [["parse"]],
         "build": [["build"]],
+        "freshness": [
+            ["source", "freshness"],
+            ["test", "--select", "tag:freshness", "--vars", '{"check_freshness": true}'],
+        ],
+        "pipeline": [
+            ["source", "freshness"],
+            ["test", "--select", "tag:freshness", "--vars", '{"check_freshness": true}'],
+            ["build"],
+        ],
     }
     if action not in commands:
         raise ValueError("Unsupported dbt action")
@@ -38,7 +47,12 @@ def execute(action: str, database: Path, artifact_root: Path, *, lock_timeout: f
     with FileLock(str(database) + ".lock", mode=0o660, timeout=lock_timeout):
         if not database.is_file():
             raise FileNotFoundError("Refusing to create an empty warehouse for dbt")
-        for arguments in commands[action]:
+        for index, arguments in enumerate(commands[action]):
+            command_env = dict(env)
+            if action in {"freshness", "pipeline"} and index < 2:
+                phase = "source_freshness" if index == 0 else "freshness_tests"
+                command_env["DBT_TARGET_PATH"] = str(invocation / phase / "target")
+                command_env["DBT_LOG_PATH"] = str(invocation / phase / "logs")
             # Fixed CLI executable and validated action.
             result = subprocess.run(  # nosec B603
                 [
@@ -49,7 +63,7 @@ def execute(action: str, database: Path, artifact_root: Path, *, lock_timeout: f
                     "--profiles-dir",
                     str(project),
                 ],
-                env=env,
+                env=command_env,
                 check=False,
                 timeout=120,
             )
@@ -61,7 +75,12 @@ def execute(action: str, database: Path, artifact_root: Path, *, lock_timeout: f
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=["check", "parse", "build"], default="check", nargs="?")
+    parser.add_argument(
+        "action",
+        choices=["check", "parse", "build", "freshness", "pipeline"],
+        default="check",
+        nargs="?",
+    )
     args = parser.parse_args()
     os.umask(0o007)
     raise SystemExit(

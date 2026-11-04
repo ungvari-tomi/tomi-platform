@@ -87,22 +87,30 @@
   api.py and currencies.py; Airflow includes runtime modules but excludes the local
   infrastructure helper. Keep Docker copy rules and Terraform hashes aligned.
 - Test new behavior, bug regressions, contracts, and meaningful integration boundaries.
-- Run local freshness/failure monitoring with `python -m scripts.monitor`. It is
-  on-demand JSON/exit-code reporting, not an external notification or scheduled
-  alert service. Keep endpoints loopback-only, disable redirects/proxy inheritance,
-  and never output authentication values or raw exception messages. The Docker
-  warehouse probe uses read-only SQL under the common FileLock (0660); contention
-  is a warning, never a healthy result. Orders and daily FX have separate freshness
-  windows; retain the seven-day FX publication allowance. Do not mutate schedules
-  or corrupt live data to test alerts. Keep reports under ignored artifacts/monitoring.
-- Local alert email is captured by Terraform-managed Mailpit: loopback SMTP 1025,
-  UI 8025, dedicated bridge, non-root image and protected persistent volume. Never
-  configure relay/forwarding, external recipients or provider credentials silently.
-  `python -m scripts.monitor_mail` delivers only alert codes/times to the fixed
-  operator@retailflow.test inbox; suppress unchanged alerts for six hours and send
-  recovery only after an emailed incident. Update delivery state only after SMTP
-  acceptance. Inbox auto-deletion is disabled; cleanup requires an explicit owner
-  action. Capture-only SMTP is not internet delivery or a scheduled alert service.
+- Data freshness belongs to dbt. Scheduled tasks invoke the lock-aware `pipeline`
+  action: source freshness, tagged freshness tests, then build. Keep separate source/
+  test/build artifacts and propagate any nonzero result. Current dataset version,
+  seed and interval must match the API. Orders use 30 minutes; FX ingestion uses
+  30 hours with per-pair checks and a seven-calendar-day publication allowance.
+  Normal dbt build does not implicitly run source freshness; use the wrapper's
+  freshness/pipeline actions. Test stale/empty/future data only in disposable storage.
+- `python -m scripts.monitor` is an on-demand operational health report only;
+  do not reimplement data freshness or poll-and-email failures there. HTTP endpoints
+  remain loopback-only, proxies/redirects disabled, and warehouse probes read-only
+  under the common 0660 FileLock. Keep reports under ignored artifacts/monitoring.
+- Automatic email comes only from DAG-level on_failure_callback after a run fails,
+  never task retries, success, recovery or timed reminders. Hash DAG/run identity,
+  serialize delivery receipts on the protected Airflow logs volume and publish a
+  receipt only after SMTP acceptance. Never email raw run IDs, exceptions or data.
+  The DAG processor alone joins Mailpit's network for approved Docker-local SMTP;
+  no socket mount or external provider credentials are allowed. Callback failures
+  must be visible in processor logs; receipt/server deduplication is not an exactly-
+  once or durable outbox guarantee. UI/CLI state edits do not trigger callbacks.
+- Mailpit keeps loopback SMTP 1025/UI 8025, protected persistent storage, fixed
+  operator@retailflow.test recipient and relay disabled. Enable Message-ID duplicate
+  suppression. No automatic inbox deletion; cleanup is an explicit owner action.
+  scripts.monitor_mail requires --test-email or --dry-run; old mail-state.json is
+  retained but unused. Never add a periodic email schedule or reminders silently.
 - Never hardcode or commit credentials. Apply least privilege, safe configuration,
   dependency/container scanning where applicable, and test security enforcement.
 - Document threat models and significant architecture/security decisions.

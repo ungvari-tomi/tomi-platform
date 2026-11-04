@@ -3,131 +3,93 @@ import os
 import smtplib
 import subprocess
 import time
-from datetime import UTC, datetime, timedelta
 from email.message import EmailMessage
+from types import SimpleNamespace
 from uuid import uuid4
 
 import httpx
 import pytest
 
+from retailflow import alerts
 from scripts import monitor_mail
 
-NOW = datetime(2026, 11, 3, 12, tzinfo=UTC)
 
-
-def outcome(*, healthy=False):
-    return {
-        "checked_at": NOW.isoformat(),
-        "exit_code": 0 if healthy else 1,
-        "alerts": []
-        if healthy
-        else [{"component": "warehouse.orders", "code": "STALE", "severity": "warning"}],
-        "observations": {"private": "must-not-be-emailed"},
-    }
-
-
-def test_alert_dedup_reminder_change_and_recovery(monkeypatch, tmp_path):
+def test_failure_event_is_sent_once_and_never_reminded(monkeypatch, tmp_path):
     sent = []
-    monkeypatch.setattr(monitor_mail, "send_message", lambda *args: sent.append(args))
-    state = tmp_path / "state.json"
-    assert monitor_mail.notify(outcome(healthy=True), state, now=NOW)["status"] == "no_alerts"
-    assert not state.exists()
-    assert monitor_mail.notify(outcome(), state, now=NOW)["kind"] == "alert"
+    monkeypatch.setattr(alerts, "send_capture", lambda *a, **k: sent.append((a, k)))
     assert (
-        monitor_mail.notify(outcome(), state, now=NOW + timedelta(minutes=10))["status"]
-        == "suppressed"
-    )
-    assert monitor_mail.notify(outcome(), state, now=NOW + timedelta(hours=6))["status"] == "sent"
-    changed = outcome()
-    changed["alerts"][0]["severity"] = "critical"
-    changed["exit_code"] = 2
-    assert (
-        monitor_mail.notify(changed, state, now=NOW + timedelta(hours=6, minutes=10))["status"]
+        alerts.notify_failed_run("retailflow_orders", "private-run-id", tmp_path)["status"]
         == "sent"
     )
     assert (
-        monitor_mail.notify(outcome(healthy=True), state, now=NOW + timedelta(hours=7))["kind"]
-        == "recovery"
+        alerts.notify_failed_run("retailflow_orders", "private-run-id", tmp_path)["status"]
+        == "suppressed"
     )
-    assert (
-        monitor_mail.notify(outcome(healthy=True), state, now=NOW + timedelta(hours=8))["status"]
-        == "no_alerts"
-    )
-    assert [args[0] for args in sent] == ["alert", "alert", "alert", "recovery"]
-    assert "must-not-be-emailed" not in state.read_text()
+    alerts.notify_failed_run("retailflow_orders", "another-run", tmp_path)
+    assert len(sent) == 2
+    assert "private-run-id" not in str(sent)
+    assert all("recovery" not in str(item) for item in sent)
 
 
-def test_smtp_failure_does_not_advance_delivery_state(monkeypatch, tmp_path):
-    def fail(*args):
-        raise OSError("private server response")
+def test_smtp_failure_leaves_event_retryable(monkeypatch, tmp_path):
+    def fail(*args, **kwargs):
+        raise OSError("private SMTP response")
 
-    monkeypatch.setattr(monitor_mail, "send_message", fail)
-    path = tmp_path / "state.json"
+    monkeypatch.setattr(alerts, "send_capture", fail)
     with pytest.raises(OSError):
-        monitor_mail.notify(outcome(), path, now=NOW)
-    assert not path.exists()
+        alerts.notify_failed_run("retailflow_orders", "run", tmp_path)
+    assert not list(tmp_path.glob("*.json"))
 
 
-def test_smtp_is_loopback_only_and_message_excludes_observations(monkeypatch):
-    messages = []
-
-    class SMTP:
-        def __init__(self, host, port, **kwargs):
-            assert host == "127.0.0.1" and port == 1025 and kwargs["timeout"] == 10
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *args):
-            return False
-
-        def send_message(self, message):
-            messages.append(message)
-            return {}
-
-    monkeypatch.setattr(monitor_mail.smtplib, "SMTP", SMTP)
-    report = outcome()
-    monitor_mail.send_message("alert", report["alerts"], report["checked_at"])
-    assert messages[0]["To"] == "operator@retailflow.test"
-    assert messages[0]["From"] == "monitor@retailflow.test"
-    assert "STALE" in messages[0].get_content()
-    assert "must-not-be-emailed" not in str(messages[0])
+def test_dag_callback_ignores_running_success_and_retry_events(monkeypatch):
+    monkeypatch.setattr(alerts, "notify_failed_run", lambda *a: pytest.fail("Must not send"))
+    for state in ["running", "queued", "success", "up_for_retry"]:
+        alerts.dag_failure({"dag_run": SimpleNamespace(state=state)})
+    alerts.dag_failure({})
 
 
-def test_header_injection_is_rejected_before_smtp():
-    report = outcome()
-    report["alerts"][0]["code"] = "STALE\r\nBcc: outside@example.com"
-    with pytest.raises(ValueError, match="alert fields"):
-        monitor_mail.send_message("alert", report["alerts"], report["checked_at"])
-
-
-def test_dry_run_does_not_send_or_advance_state(monkeypatch, tmp_path, capsys):
-    monkeypatch.setattr(monitor_mail, "ROOT", tmp_path)
-    monkeypatch.setattr(monitor_mail, "monitor_report", outcome)
-    monkeypatch.setattr(monitor_mail, "notify", lambda *a: pytest.fail("Dry run must not notify"))
-    monkeypatch.setattr("sys.argv", ["monitor_mail", "--dry-run"])
-    with pytest.raises(SystemExit) as result:
-        monitor_mail.main()
-    assert result.value.code == 1
-    assert json.loads(capsys.readouterr().out)["notification"]["status"] == "dry_run"
-    assert not (tmp_path / "artifacts/monitoring/mail-state.json").exists()
-
-
-def test_delivery_error_has_distinct_exit_code_and_no_raw_response(monkeypatch, tmp_path, capsys):
-    monkeypatch.setattr(monitor_mail, "ROOT", tmp_path)
-    monkeypatch.setattr(monitor_mail, "monitor_report", outcome)
+def test_dag_callback_filters_context_and_sanitizes_failures(monkeypatch):
+    seen = []
+    monkeypatch.setattr(
+        alerts, "notify_failed_run", lambda *a: seen.append(a) or {"status": "sent"}
+    )
+    run = SimpleNamespace(state="failed", dag_id="retailflow_orders", run_id="failure")
+    alerts.dag_failure({"dag_run": run, "exception": "must-not-be-emailed"})
+    assert seen[0][:2] == ("retailflow_orders", "failure")
+    assert "must-not-be-emailed" not in str(seen)
 
     def fail(*args):
-        raise RuntimeError("private server response")
+        raise RuntimeError("private SMTP response")
 
-    monkeypatch.setattr(monitor_mail, "notify", fail)
+    monkeypatch.setattr(alerts, "notify_failed_run", fail)
+    with pytest.raises(RuntimeError) as error:
+        alerts.dag_failure({"dag_run": run})
+    assert "private SMTP response" not in str(error.value)
+
+
+def test_local_capture_rejects_external_hosts():
+    with pytest.raises(ValueError):
+        alerts.send_capture("failure", "body", "event", host="smtp.gmail.com")
+
+
+def test_cli_requires_explicit_diagnostic_mode(monkeypatch):
     monkeypatch.setattr("sys.argv", ["monitor_mail"])
     with pytest.raises(SystemExit) as result:
         monitor_mail.main()
-    assert result.value.code == 3
-    output = capsys.readouterr().out
-    assert "private server response" not in output
-    assert json.loads(output)["notification"] == {"status": "failed", "error_type": "RuntimeError"}
+    assert result.value.code == 2
+
+
+def test_dry_run_never_sends_even_when_health_check_fails(monkeypatch, tmp_path, capsys):
+    monkeypatch.setattr(monitor_mail, "ROOT", tmp_path)
+    monkeypatch.setattr(
+        monitor_mail, "monitor_report", lambda: {"status": "critical", "exit_code": 2}
+    )
+    monkeypatch.setattr(monitor_mail, "send_capture", lambda *a, **k: pytest.fail("Must not send"))
+    monkeypatch.setattr("sys.argv", ["monitor_mail", "--dry-run"])
+    with pytest.raises(SystemExit) as result:
+        monitor_mail.main()
+    assert result.value.code == 2
+    assert json.loads(capsys.readouterr().out)["notification"] == "not_sent"
 
 
 @pytest.mark.skipif(
@@ -202,21 +164,23 @@ def test_local_inbox_captures_alerts_and_persists_without_relay(monkeypatch, tmp
                 raise AssertionError("Disposable Mailpit did not become ready")
 
             ready()
-            original_send = monitor_mail.send_message
+            original_send = alerts.send_capture
             monkeypatch.setattr(
-                monitor_mail,
-                "send_message",
-                lambda kind, alerts, checked: original_send(kind, alerts, checked, port=smtp),
+                alerts,
+                "send_capture",
+                lambda subject, body, identity, **kwargs: original_send(
+                    subject, body, identity, host="127.0.0.1", port=smtp
+                ),
             )
-            state = tmp_path / "state.json"
-            monitor_mail.notify(outcome(), state, now=NOW)
-            monitor_mail.notify(outcome(), state, now=NOW + timedelta(minutes=10))
-            monitor_mail.notify(outcome(healthy=True), state, now=NOW + timedelta(minutes=20))
+            state = tmp_path / "events"
+            alerts.notify_failed_run("retailflow_orders", "failed-run-one", state)
+            alerts.notify_failed_run("retailflow_orders", "failed-run-one", state)
+            alerts.notify_failed_run("retailflow_exchange_rates", "failed-run-two", state)
             messages = ready()
             assert messages["total"] == 2
             assert {message["Subject"] for message in messages["messages"]} == {
-                "RetailFlow local alert",
-                "RetailFlow local recovery",
+                "RetailFlow DAG failed: retailflow_orders",
+                "RetailFlow DAG failed: retailflow_exchange_rates",
             }
             rejected = EmailMessage()
             rejected["From"], rejected["To"] = "monitor@retailflow.test", "outside@example.com"

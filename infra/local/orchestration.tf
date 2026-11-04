@@ -76,6 +76,8 @@ locals {
     # pragma: allowlist nextline secret
     "RETAILFLOW_STATE_DIR=/opt/airflow/state",
     "RETAILFLOW_DATASET_VERSION=${var.orders_dataset_version}",
+    "RETAILFLOW_SEED=${var.orders_seed}",
+    "RETAILFLOW_INTERVAL_SECONDS=${var.orders_interval_seconds}",
   ]
 }
 
@@ -215,10 +217,16 @@ resource "docker_container" "airflow_init" {
 }
 
 resource "docker_container" "airflow" {
-  for_each       = toset(["api-server", "scheduler", "dag-processor"])
-  name           = "retailflow-airflow-${each.key}"
-  image          = docker_image.airflow.image_id
-  network_mode   = docker_network.azurite.name
+  for_each = toset(["api-server", "scheduler", "dag-processor"])
+  name     = "retailflow-airflow-${each.key}"
+  image    = docker_image.airflow.image_id
+  networks_advanced {
+    name = docker_network.azurite.name
+  }
+  dynamic "networks_advanced" {
+    for_each = each.key == "dag-processor" ? [1] : []
+    content { name = docker_network.mailpit.name }
+  }
   user           = "50000:0"
   group_add      = each.key == "scheduler" ? ["10001"] : []
   env            = concat(local.airflow_env, each.key == "scheduler" ? ["RETAILFLOW_DUCKDB_PATH=/warehouse/retailflow.duckdb"] : [])

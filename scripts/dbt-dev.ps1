@@ -2,12 +2,17 @@
 [CmdletBinding()]
 param(
     [Parameter(Position = 0)]
-    [ValidateSet('check', 'parse', 'build')]
+    [ValidateSet('check', 'parse', 'build', 'freshness', 'pipeline')]
     [string]$Action = 'parse',
     [string]$ProjectDirectory,
     [string]$ArtifactDirectory,
     [string]$WarehouseVolume = 'retailflow-duckdb-data',
-    [string]$Image = 'retailflow-dbt:local'
+    [string]$Image = 'retailflow-dbt:local',
+    [ValidateSet('orders-v2', 'orders-v3')]
+    [string]$DatasetVersion = 'orders-v3',
+    [long]$Seed = 42,
+    [ValidateRange(1, 3600)]
+    [int]$IntervalSeconds = 600
 )
 
 Set-StrictMode -Version Latest
@@ -47,6 +52,9 @@ $dockerArguments = @(
     '--mount', "type=volume,source=$WarehouseVolume,target=/warehouse",
     '--mount', "type=bind,source=$projectPath,target=/app/project,readonly",
     '--mount', 'type=volume,target=/artifacts',
+    '--env', "RETAILFLOW_DATASET_VERSION=$DatasetVersion",
+    '--env', "RETAILFLOW_SEED=$Seed",
+    '--env', "RETAILFLOW_INTERVAL_SECONDS=$IntervalSeconds",
     $imageId, $Action
 )
 Write-Host "Running dbt $Action using $projectPath"

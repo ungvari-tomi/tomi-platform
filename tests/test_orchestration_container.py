@@ -54,6 +54,8 @@ for name, expected_id in workflows:
     assert dag.max_active_runs == 1
     assert dag.catchup is False
     assert dag.is_paused_upon_creation is True
+    assert dag.on_failure_callback is namespace['dag_failure']
+    assert all(not task.on_failure_callback for task in dag.tasks)
     assert len(dag.tasks) == 3
     assert dag.get_task('extract').downstream_task_ids == {'load'}
     assert dag.get_task('load').downstream_task_ids == {'dbt_build'}

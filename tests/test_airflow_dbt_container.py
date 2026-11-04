@@ -37,15 +37,22 @@ def test_airflow_task_runs_isolated_dbt_and_propagates_quality_failure():
             "p=Path('/warehouse/retailflow.duckdb'); c=duckdb.connect(str(p)); "
             'c.execute("CREATE SCHEMA raw; '
             "CREATE TABLE raw.orders AS SELECT 'dataset' AS dataset_id, "
-            "1::BIGINT AS order_id, TIMESTAMPTZ '2026-10-30 12:00:00+00' AS created_at, "
+            "1::BIGINT AS order_id, current_timestamp AS created_at, "
             "'DE' AS country, 'EUR' AS currency, 'product-001' AS product_id, "
             "1::INTEGER AS quantity, 500::BIGINT AS unit_price_minor, 500::BIGINT AS total_minor, "
             "'orders/metadata.json' AS first_manifest; "
             "CREATE TABLE raw.exchange_rates AS SELECT 'ECB' AS provider, 'EUR' AS base, "
-            "'HUF' AS quote, DATE '2026-10-30' AS rate_date, "
-            "366.33::DECIMAL(24,12) AS rate, 'fx/metadata.json' AS first_manifest; "
+            "quote, current_date AS rate_date, "
+            "366.33::DECIMAL(24,12) AS rate, quote || '/metadata.json' AS first_manifest "
+            "FROM (VALUES ('HUF'),('PLN'),('CZK'),('RON'),('GBP'),"
+            "('CHF'),('SEK'),('NOK'),('DKK')) q(quote); "
             "CREATE SCHEMA ops; "
-            "CREATE TABLE ops.fx_batch_records AS SELECT 'fx/metadata.json' AS manifest_path, "
+            "CREATE TABLE ops.datasets AS SELECT 'dataset' AS dataset_id, "
+            "'orders-v3' AS dataset_version, "
+            "42::BIGINT AS seed, 600::BIGINT AS interval_seconds; "
+            "CREATE TABLE ops.loaded_batches AS SELECT first_manifest AS manifest_path, "
+            "'exchange-rates' AS source, current_timestamp AS loaded_at FROM raw.exchange_rates; "
+            "CREATE TABLE ops.fx_batch_records AS SELECT first_manifest AS manifest_path, "
             'provider,base,quote,rate_date,rate_date AS requested_date FROM raw.exchange_rates"); '
             "c.close(); permissions(p)",
         )
