@@ -1,7 +1,8 @@
 # Parallel batch, streaming and webhook ingestion
 
-Status: deployed locally on 2026-11-19 through an owner-approved saved Terraform
-plan, after CI passed for commit `37b42a1`. Batch and event dbt pipelines passed
+Status: deployed locally on 2026-11-19 through owner-approved saved Terraform
+plans, including the CI-verified reliability fixes in commit `0d87312`. Batch and
+event dbt pipelines passed
 against the managed warehouse. The batch code, source contracts and historical
 namespaces remain intact. All infrastructure is local and opt-in.
 
@@ -42,7 +43,7 @@ Only then does it synchronously commit offset+1. One-event landing units keep
 partition/offset identity stable across failures and rebalances. Invalid messages
 stop the consumer without skipping an offset; raw invalid bodies are not copied
 to logs or an unvalidated dead-letter archive. Restart replays uncommitted data.
-The prepared contention fix waits on the same polled event while another writer
+The consumer waits on the same polled event while another writer
 holds the warehouse lock, without polling forward or committing its offset. A
 shutdown during that wait leaves it uncommitted. The consumer's maximum poll
 interval is fifteen minutes, allowing the bounded dbt wrapper to finish normally.
@@ -71,8 +72,7 @@ defaults to false (`RETAILFLOW_PARALLEL_INGESTION_ENABLED`). It prepares:
 - A separate host-access bridge attached only to Kafka for its loopback listener.
 - Loopback-only Kafka 19092 and webhook 18090; controller ports stay internal.
 
-The host-access bridge and bounded topic-readiness retry are prepared fixes,
-pending publication, CI and a separately approved deployment. They preserve the
+The deployed host-access bridge and bounded topic-readiness retry preserve the
 internal worker network and the existing broker data volume/cluster identity.
 The broker's additional bridge permits outbound connectivity; it receives no
 blob credential or webhook key. Worker network isolation remains unchanged.
@@ -103,7 +103,7 @@ require container restart/reviewed deployment to take effect. Broker/webhook
 outbound destinations are restricted to explicit loopback or Docker-local names;
 HTTP proxies and redirects are disabled.
 For a Windows-hosted Terraform CLI and the Docker Desktop Linux engine, the
-prepared configuration normalizes the bind source to Docker Desktop's reported
+configuration normalizes the bind source to Docker Desktop's reported
 `/run/desktop/mnt/host/<drive>/...` path. Linux-hosted paths remain unchanged.
 The mount stays read-only and scoped to the two shipment services; it is not
 ignored by Terraform lifecycle rules.
@@ -172,29 +172,27 @@ pipeline verification and an orchestrated run's final status are separate eviden
 All three deployment verification DAG runs subsequently finished successfully:
 orders, Frankfurter exchange rates and parallel event analytics.
 
-The first topic initializer exited because its immediate metadata check did not
-observe three partitions after creation. Broker inspection confirmed all three
-partitions, and retrying the unchanged initializer succeeded. This startup race
-still needs a bounded metadata retry in a future image update; do not reset the
-topic or discard existing offsets to recover it. The review, backups and
-deployment evidence are retained under ignored `artifacts/` directories. The
-earlier preparation notes below describe the pre-deployment history.
+The first deployment exposed a topic-metadata startup race and an unreachable
+host Kafka listener on its internal-only network. The follow-up release fixes
+both issues, normalizes Windows bind paths and the initializer's swap setting,
+and retries the same uncommitted event during warehouse contention. Its saved
+plan matched the approved preview and all five CI jobs passed for `0d87312`
+([CI run](https://github.com/ungvari-tomi/tomi-platform/actions/runs/44527900153)).
+After apply, Terraform reported no changes, host Kafka metadata access on
+`127.0.0.1:19092` succeeded, and the initializer passed on its first run. The
+original Kafka topic identity, 2,770 orders, 64 FX rates and 1,501 batch ledger
+entries were preserved. Inventory and shipment rows each advanced from four to
+five after restart. All 3,034 pre-existing blobs were verified again after apply;
+a fresh locked warehouse snapshot and the reviews remain under ignored `artifacts/`.
+Both deployed dbt pipelines passed again (37 batch tests and 14 parallel tests,
+plus separate freshness checks). The three schedules were restored, customer
+ingestion stayed disabled/paused, and the on-demand operational health report
+returned `ok` with no alerts.
 
-The post-apply check also found unresolved infrastructure drift: Docker recorded
-the Kafka loopback port binding but did not expose a reachable host listener on
-19092. Internal broker traffic and warehouse ingestion work. Terraform proposes
-replacing the broker for that port difference, updating Windows-normalized
-signing-key mount paths, and normalizing the initializer's swap setting. That
-follow-up plan was saved but **not applied**. Do not treat this deployment as
-drift-free or use the host Kafka endpoint until this is resolved through another
-reviewed change. The webhook, orders API, Airflow and Mailpit host ports were
-reachable during verification.
-
-The follow-up fixes passed focused regression tests and a real disposable Kafka
+The fixes passed focused regression tests and a real disposable Kafka
 test covering cold topic creation, idempotent reinitialization, internal delivery,
 loopback metadata access, duplicate handling, consumer resume and webhook replay.
-The changed runtime and Terraform configuration have not yet replaced the live
-containers. The original deployment limitations above remain until that apply.
+The changed runtime and Terraform configuration are now deployed locally.
 
 Unit tests cover signed requests, contract rejection, frozen retries, checksum
 failures, offset acknowledgement order, duplicate/conflicting events and batch
@@ -219,18 +217,8 @@ checks and rejected deliberately corrupted stock movement data. A separate parse
 confirmed the default batch selection still has three models and 37 tests. No
 test attached a worker to the managed warehouse or deployed this extension.
 
-After the successful runs, Docker Desktop's backend began returning internal API
-errors. The live deployment preview could not be completed, and cleanup could
-not be rechecked against the backend. No reset or changing apply was attempted.
-The test harness now reports cleanup failures explicitly, attempts every owned
-resource, and restricts deletion to its generated test namespace. A mocked
-backend-failure regression passed; rerun the real test after Docker recovery.
-
-The owner-approved single Docker restart recovered the engine on 2026-11-19;
-follow-up inspection found no temporary Kafka/fixture containers. A read-only
-infrastructure preview was saved under ignored
-`artifacts/parallel-ingestion-preview-20261119-recovered`: 13 creates, 14 image/
-container replacements and one metadata-container update, with every existing
-volume preserved. The shipment key is absent from the plan. This is not an
-approved release/apply plan: source publication/CI and fresh blob/locked warehouse
-backups are still required. No infrastructure was applied or reset.
+Docker Desktop was updated before the live deployments. Earlier failed previews
+and backend-recovery evidence remain under ignored artifacts as historical
+records. The test harness reports cleanup failures explicitly, attempts every
+owned resource and restricts deletion to its generated disposable namespace.
+Those historical previews must never be reused as current deployment plans.
