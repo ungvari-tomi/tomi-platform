@@ -1,8 +1,10 @@
 # MongoDB product catalog: design and first milestone
 
-Status: foundation implemented and tested in disposable local storage. No commit,
-push, Terraform apply, persistent catalog deployment or existing-pipeline change
-has been performed for this milestone. The default Terraform configuration is disabled.
+Status: foundation deployed locally on 2026-11-19 from CI-verified commit
+`f6ae472`, through an owner-approved catalog-only saved plan. The deployment added
+eight resources, with no existing-resource replacement or deletion. The default
+Terraform configuration remains disabled for other installations; use
+`-var='enabled=true'` when reviewing the deployed catalog's state.
 
 ## Existing integration points
 
@@ -199,7 +201,11 @@ They concern only the separate catalog root; do not run a plan/apply in `infra/l
 # Restrict the new credential directory on Windows; do not weaken inherited ACLs.
 $catalogSecrets = (Resolve-Path .local-secrets/mongodb).Path
 $ownerSid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value
-icacls $catalogSecrets /inheritance:r /grant:r "*${ownerSid}:(OI)(CI)F" "*S-1-5-18:(OI)(CI)F" "*S-1-5-32-544:(OI)(CI)F" /T
+icacls $catalogSecrets /inheritance:r /grant:r "*${ownerSid}:(OI)(CI)F" "*S-1-5-18:(OI)(CI)F" "*S-1-5-32-544:(OI)(CI)F"
+Get-ChildItem -LiteralPath $catalogSecrets -Force -File | ForEach-Object {
+    icacls $_.FullName /inheritance:r /grant:r "*${ownerSid}:F" "*S-1-5-18:F" "*S-1-5-32-544:F"
+    if ($LASTEXITCODE -ne 0) { throw 'Credential-file ACL update failed' }
+}
 icacls $catalogSecrets
 
 $catalogTerraform = (Resolve-Path .bootstrap/terraform/terraform.exe).Path
@@ -226,6 +232,10 @@ The Windows path is normalized to Docker Desktop's Linux VM mount path. A Linux
 host can use `-var='docker_host=unix:///var/run/docker.sock'`, but must separately
 review host file ownership/secret readability for UIDs 999 and 10001 before apply.
 No automatic permission weakening is provided for that case.
+On Windows, inheritable directory grants alone can leave files inaccessible.
+Apply explicit file grants as above, inspect their effective ACLs and verify
+non-root read access through a read-only mount before applying. The local
+deployment verified owner/SYSTEM/Administrator access and both runtime UIDs.
 
 To re-seed without overwriting operational changes, run
 `docker start -a retailflow-catalog-seed`; verify with
@@ -239,8 +249,8 @@ docker run --rm --network retailflow-product-catalog --read-only --cap-drop ALL 
 The Python `Catalog` API provides the manual CRUD/query examples used by tests.
 It has no arbitrary external URI option. Use `docker stop --timeout 60
 retailflow-mongodb` for a graceful WiredTiger shutdown, and `docker start
-retailflow-mongodb` to resume with the same protected data volume. Neither command
-is run against a persistent catalog during this preparation milestone.
+retailflow-mongodb` to resume with the same protected data volume. Restart
+persistence was verified for the deployed catalog without restarting other services.
 
 ## Backup and new-target recovery
 
@@ -287,8 +297,19 @@ the server/client workloads stay non-root and each client mounts only its own
 identity. Host secret file permissions are not weakened to accommodate CI.
 The local checks passed 27 focused catalog/CI-selection tests and the real MongoDB
 security/restart/recovery integration, plus Ruff, Bandit, dependency auditing,
-workflow validation, source safety and Terraform validation/preflight. Hosted CI
-has not been run for this uncommitted milestone.
+workflow validation, source safety and Terraform validation/preflight. All five
+jobs passed in [the exact-source CI run](https://github.com/ungvari-tomi/tomi-platform/actions/runs/44597498892).
+
+Live verification confirmed 20 products (7 apparel, 7 electronics, 6 homeware),
+40 variants, the strict validator and all five indexes. Actual application
+privileges matched the restricted role definitions. No credential values were
+found in Docker configuration, server logs or catalog Terraform state. A completed
+backup was transferred and checksum-verified, then restored into a fresh
+`catalog_restore_<uuid>` database with its documents, validator and indexes.
+That recovery database and backup remain available for owner review; neither
+was promoted or auto-deleted. Existing platform container IDs stayed unchanged,
+and its on-demand health report returned `ok`. Deployment evidence is retained
+under ignored `artifacts/mongodb-deployment/`; Terraform reported no changes.
 
 ```powershell
 docker build -f infra/mongodb/server.Dockerfile -t retailflow-mongodb:validation infra/mongodb

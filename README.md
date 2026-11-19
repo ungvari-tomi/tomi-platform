@@ -25,14 +25,16 @@ flowchart LR
     Analytics["DuckDB views<br/>Clean orders, rates and EUR values"]
     Reporting["Daily sales model<br/>Verified aggregate snapshots"]
     Dashboard["Streamlit dashboard<br/>Sales, filters and FX coverage"]
+    Catalog["MongoDB product catalog<br/>20 synthetic products"]
 
     Orders --> Extract
     FX --> Extract
     Extract --> Blob --> Load --> Raw --> Dbt --> Analytics
     Analytics --> Reporting --> Dashboard
+    Catalog -.->|Planned extraction| Blob
 ```
 
-Arrows show the deployed local data path. The dashboard reads independent verified
+Solid arrows show the deployed data path; catalog extraction is planned. The dashboard reads independent verified
 aggregate snapshots. DuckDB holds raw tables and transformed views. Airflow runs
 the extraction, loading and dbt steps as one workflow for each source.
 
@@ -64,12 +66,11 @@ The new paths do not republish orders or add them to revenue totals. Inventory
 references existing product IDs; shipments reference generated order IDs without
 customer names or addresses. [Parallel ingestion design, tests and deployment](docs/parallel-ingestion.md).
 
-## Prepared product catalog
+## MongoDB product catalog
 
-A MongoDB Community product catalog is implemented and tested in disposable
-storage, but is **not deployed**. It deterministically covers the existing 20
+A MongoDB Community product catalog is **deployed locally**. It deterministically covers the existing 20
 product IDs with electronics, apparel and homeware documents. Its independent
-Terraform root, authentication, schema validation, indexes and recovery drill
+Terraform root, authentication, schema validation, indexes and verified recovery drill
 leave the deployed pipelines and protected volumes unchanged. Catalog extraction
 and warehouse enrichment are later milestones. See the [catalog design and runbook](docs/mongodb-catalog.md).
 
