@@ -1,6 +1,7 @@
 # Streamlit sales dashboard
 
-Status: implemented for local review; not deployed or published to GitHub yet.
+Status: deployed locally on 2026-11-19 from CI-verified commit `64a1a1e` through
+an owner-approved saved Terraform plan. Open <http://127.0.0.1:8501> locally.
 The first milestone covers sales. Inventory and shipment pages are future work.
 
 ```mermaid
@@ -81,13 +82,26 @@ exact EUR totals, visible FX gaps and retention of the last report after deliber
 disposable source corruption caused dbt to fail. A separate real parse confirmed
 the default selection still has three models and 37 tests. No validation workload
 read or changed the live warehouse; the saved Terraform preview preserved every
-existing data volume. The image, configuration and app are not yet deployed.
+existing data volume.
 
-After an approved deployment, open <http://127.0.0.1:8501>. To prepare enablement,
+Live deployment verification passed: Streamlit rendered four metrics from a
+checksum-verified snapshot containing 1,998 aggregate rows and 2,803 orders across
+two dataset profiles. It retained 965 orders without usable exact-date FX in
+counts and explicitly excluded them from EUR revenue. The reporting build passed
+45 tests and parallel analytics passed 14, plus separate source/data freshness
+checks. All baseline warehouse tables were preserved, 3,064 pre-existing blobs
+were verified after apply, Terraform reported no changes and operational health
+returned `ok` with no alerts. The original orders/FX and event analytics schedules
+were restored; customer ingestion remains disabled/paused. Backups and deployment
+evidence remain under ignored `artifacts/` directories.
+
+[Successful CI run for the deployed source](https://github.com/ungvari-tomi/tomi-platform/actions/runs/44536875630).
+
+Open the deployed dashboard at <http://127.0.0.1:8501>. For another local installation,
 set `RETAILFLOW_DASHBOARD_ENABLED=true` in the ignored `.env`, then follow the
 [saved-plan and backup deployment workflow](ci-cd.md). A reviewed image/container
-update is required; editing `.env` does not change running services. No live
-enablement, Terraform apply, commit or push is part of this preparation milestone.
+update is required; editing `.env` does not change running services. Deployment
+requires the owner's approval after source validation and saved-plan review.
 
 ## Governance, costs and limits
 
