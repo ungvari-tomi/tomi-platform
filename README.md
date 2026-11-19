@@ -6,7 +6,7 @@ its quality, and turn it into useful business reporting.
 
 The platform runs locally using Docker and Terraform. Orders are synthetic;
 exchange rates are real reference data retrieved from Frankfurter/ECB. No real
-customer data is needed. A dashboard is a future step.
+customer data is needed. A Streamlit sales dashboard is prepared for review.
 
 See the [operation and development guide](docs/runbook.md) for commands and setup.
 
@@ -22,8 +22,8 @@ flowchart LR
     Raw["DuckDB<br/>Raw data and batch history"]
     Dbt["dbt<br/>Freshness checks, SQL models and tests"]
     Analytics["DuckDB views<br/>Clean orders, rates and EUR values"]
-    Reporting["Future: reporting models<br/>Daily sales and business metrics"]
-    Dashboard["Future: dashboard<br/>Explore sales and trends"]
+    Reporting["Prepared: daily sales model<br/>Verified aggregate snapshots"]
+    Dashboard["Prepared: Streamlit dashboard<br/>Sales, filters and FX coverage"]
 
     Orders --> Extract
     FX --> Extract
@@ -34,8 +34,8 @@ flowchart LR
     class Reporting,Dashboard planned;
 ```
 
-Solid arrows show the implemented data path. Dashed arrows show planned reporting
-work. DuckDB holds both the raw tables and the transformed views. Airflow runs
+Solid arrows show the deployed data path. Dashed arrows show the prepared reporting
+milestone, which has not been deployed. DuckDB holds raw tables and transformed views. Airflow runs
 the extraction, loading and dbt steps as one workflow for each source.
 
 ## Three parallel ingestion paths
@@ -148,12 +148,12 @@ Your approval is sufficient: this is a single-maintainer project.
 Airflow automation, dbt transformations/freshness/tests, EUR valuation, local failure
 email, backups, database snapshots, and CI/delivery.
 
-**Next:** reporting models that summarize daily sales, units sold, order counts
-and EUR revenue. They should also expose missing-rate coverage so partial revenue
-totals remain understandable. These models have been proposed and are not yet built.
+**Prepared for review:** an opt-in daily sales dbt model and Terraform-managed
+Streamlit dashboard, with country/product/date filters, exact EUR revenue and
+explicit missing-rate coverage. It reads independent verified aggregate snapshots.
+This milestone has not been deployed. See the [dashboard guide](docs/dashboard.md).
 
-**Future:** a dashboard built on those reporting models, for exploring sales over
-time and comparing countries/products. Dashboard technology has not been selected.
+**Future:** inventory and shipment dashboard pages and richer reporting navigation.
 Optional Azure/Snowflake targets remain future possibilities; the current platform
 is a local engineering project, not a production cloud deployment.
 

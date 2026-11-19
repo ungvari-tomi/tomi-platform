@@ -76,7 +76,7 @@ jobs:
       - name: SQL lint
         run: uv run --locked sqlfluff lint infra/dbt/project
       - name: Python security checks
-        run: uv run --locked bandit -r retailflow dags infra/duckdb infra/dbt/run.py infra/orchestration/start.py scripts -q
+        run: uv run --locked bandit -r retailflow dags infra/duckdb infra/dbt/run.py infra/dbt/reporting.py infra/dashboard/app.py infra/orchestration/start.py scripts -q
       - name: Tests
         env:
           RETAILFLOW_SELECTED_TESTS: ${{ needs.changes.outputs.tests }}
@@ -125,8 +125,10 @@ jobs:
         run: |
           uv export --locked --no-dev --no-emit-project --format requirements-txt --output-file "$RUNNER_TEMP/root-requirements.txt" --quiet
           uv export --project infra/dbt --locked --no-dev --no-emit-project --format requirements-txt --output-file "$RUNNER_TEMP/dbt-requirements.txt" --quiet
+          uv export --project infra/dashboard --locked --no-dev --no-emit-project --format requirements-txt --output-file "$RUNNER_TEMP/dashboard-requirements.txt" --quiet
           uv run --locked pip-audit --disable-pip --require-hashes -r "$RUNNER_TEMP/root-requirements.txt"
           uv run --locked pip-audit --disable-pip --require-hashes -r "$RUNNER_TEMP/dbt-requirements.txt"
+          uv run --locked pip-audit --disable-pip --require-hashes -r "$RUNNER_TEMP/dashboard-requirements.txt"
 
   integration:
     needs: changes
@@ -141,6 +143,7 @@ jobs:
       RETAILFLOW_TEST_DBT_IMAGE: "1"
       RETAILFLOW_TEST_MAILPIT_IMAGE: "1"
       RETAILFLOW_TEST_PARALLEL_IMAGES: "1"
+      RETAILFLOW_TEST_DASHBOARD_IMAGE: "1"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -169,6 +172,7 @@ jobs:
           docker build --provenance=false --file infra/orchestration/api.Dockerfile --tag retailflow-orders-api:validation .
           docker build --provenance=false --file infra/orchestration/airflow.Dockerfile --tag retailflow-airflow:validation .
           docker build --provenance=false --file infra/parallel/Dockerfile --tag retailflow-parallel:validation .
+          docker build --provenance=false --file infra/dashboard/Dockerfile --tag retailflow-dashboard:validation .
       - name: Selected tests using disposable data
         env:
           RETAILFLOW_SELECTED_TESTS: ${{ needs.changes.outputs.tests }}

@@ -3,6 +3,7 @@
 !.dockerignore
 !requirements.txt
 !run.py
+!reporting.py
 !project/
 !project/**
 project/target/

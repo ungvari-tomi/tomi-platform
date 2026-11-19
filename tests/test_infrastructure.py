@@ -200,3 +200,30 @@ def test_kafka_host_network_creation_allowed_but_deletion_rejected():
                 ]
             }
         )
+
+
+def test_dashboard_resources_are_local_and_existing_storage_stays_protected():
+    resources = [
+        "docker_volume.reporting[0]",
+        "docker_network.dashboard[0]",
+        "docker_image.dashboard[0]",
+        "docker_container.dashboard[0]",
+        "docker_container.reporting_permissions[0]",
+    ]
+    result = infrastructure.plan_summary(
+        {
+            "resource_changes": [
+                {"address": address, "change": {"actions": ["create"]}} for address in resources
+            ]
+        }
+    )
+    assert result["creates"] == resources
+    for address in resources[:2]:
+        with pytest.raises(ValueError, match="deletes data storage or networking"):
+            infrastructure.plan_summary(
+                {
+                    "resource_changes": [
+                        {"address": address, "change": {"actions": ["delete", "create"]}}
+                    ]
+                }
+            )

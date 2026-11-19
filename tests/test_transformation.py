@@ -8,11 +8,16 @@ import pytest
 from retailflow import transformation
 
 
-@pytest.mark.parametrize("customers,parallel", [(False, False), (True, False), (False, True)])
+@pytest.mark.parametrize(
+    "customers,parallel,reporting",
+    [(False, False, False), (True, False, False), (False, True, False), (False, False, True)],
+)
 def test_build_sanitizes_environment_and_returns_small_summary(
-    monkeypatch, tmp_path: Path, customers, parallel
+    monkeypatch, tmp_path: Path, customers, parallel, reporting
 ):
     monkeypatch.setenv("RETAILFLOW_DBT_ARTIFACT_DIR", str(tmp_path))
+    monkeypatch.setenv("RETAILFLOW_DASHBOARD_ENABLED", "true" if reporting else "false")
+    monkeypatch.setenv("RETAILFLOW_REPORTING_DIR", str(tmp_path / "reports"))
     monkeypatch.setenv("AIRFLOW_DB_PASSWORD", "test-only-not-a-secret")
     monkeypatch.setenv("PYTHONPATH", "must-not-enter-dbt")
     monkeypatch.setenv("RETAILFLOW_CUSTOMER_PRIVACY_KEY_FILE", "/run/secrets/customer.json")
@@ -23,7 +28,13 @@ def test_build_sanitizes_environment_and_returns_small_summary(
 
     def execute(command, *, env, check, timeout):
         action = (
-            "parallel-pipeline" if parallel else "customer-pipeline" if customers else "pipeline"
+            "parallel-pipeline"
+            if parallel
+            else "customer-pipeline"
+            if customers
+            else "reporting-pipeline"
+            if reporting
+            else "pipeline"
         )
         assert command == ["/opt/dbt/venv/bin/python", "-I", "/opt/dbt/run.py", action]
         assert check is True and timeout == 450
@@ -31,6 +42,7 @@ def test_build_sanitizes_environment_and_returns_small_summary(
         assert "RETAILFLOW_CUSTOMER_PRIVACY_KEY" not in env
         assert "RETAILFLOW_CUSTOMER_PRIVACY_KEY_FILE" not in env
         assert "RETAILFLOW_SHIPMENT_KEY_FILE" not in env
+        assert ("RETAILFLOW_REPORTING_DIR" in env) is reporting
         assert env["PYTHONNOUSERSITE"] == "1"
         target = Path(env["RETAILFLOW_DBT_ARTIFACT_DIR"]) / "invocation/target"
         target.mkdir(parents=True)

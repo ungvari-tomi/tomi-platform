@@ -18,6 +18,7 @@ COPY --chown=50000:0 dags /opt/airflow/dags
 COPY --chown=50000:0 infra/orchestration/start.py /opt/airflow/start.py
 COPY --from=dbt_runtime /opt/dbt/venv /opt/dbt/venv
 COPY infra/dbt/run.py /opt/dbt/run.py
+COPY infra/dbt/reporting.py /opt/dbt/reporting.py
 COPY infra/dbt/project /opt/dbt/project
 ENV PYTHONPATH=/opt/airflow PYTHONDONTWRITEBYTECODE=1
 CMD ["python", "/opt/airflow/start.py", "api-server"]

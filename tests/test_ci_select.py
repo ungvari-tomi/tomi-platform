@@ -48,6 +48,7 @@ def test_changed_test_is_selected_and_container_tests_enable_docker():
     assert selected["tests"] == ["tests/test_release_review.py"]
     assert not selected["integration"]
     assert ci_select.select(["tests/test_orchestration_container.py"])["integration"]
+    assert ci_select.select(["tests/test_dashboard_container.py"])["integration"]
 
 
 def test_terraform_hash_test_requires_real_terraform_job():

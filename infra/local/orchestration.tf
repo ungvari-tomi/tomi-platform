@@ -159,6 +159,7 @@ resource "docker_image" "airflow" {
     startup      = filesha256("${path.module}/../orchestration/start.py")
     duckdb       = filesha256("${path.module}/../orchestration/duckdb-requirements.txt")
     dbt_runtime  = filesha256("${path.module}/../dbt/run.py")
+    reporting    = filesha256("${path.module}/../dbt/reporting.py")
     dbt_packages = filesha256("${path.module}/../dbt/requirements.txt")
     dbt_project = sha256(join("", [
       for name in sort(tolist(setunion(
@@ -250,6 +251,8 @@ resource "docker_container" "airflow" {
     "RETAILFLOW_DUCKDB_PATH=/warehouse/retailflow.duckdb"
     ] : [], each.key == "scheduler" && var.customer_pipeline_enabled ? [
     "RETAILFLOW_CUSTOMER_PRIVACY_KEY_FILE=/run/retailflow-secrets/customer.json"
+    ] : [], each.key == "scheduler" && var.dashboard_enabled ? [
+    "RETAILFLOW_DASHBOARD_ENABLED=true", "RETAILFLOW_REPORTING_DIR=/reports"
   ] : [])
   command        = ["python", "/opt/airflow/start.py", each.key]
   memory         = each.key == "scheduler" ? 1536 : 1024
@@ -287,6 +290,14 @@ resource "docker_container" "airflow" {
     }
   }
   dynamic "mounts" {
+    for_each = each.key == "scheduler" && var.dashboard_enabled ? [1] : []
+    content {
+      target = "/reports"
+      source = docker_volume.reporting[0].name
+      type   = "volume"
+    }
+  }
+  dynamic "mounts" {
     for_each = each.key == "scheduler" ? [1] : []
     content {
       target = "/warehouse"
@@ -294,5 +305,5 @@ resource "docker_container" "airflow" {
       type   = "volume"
     }
   }
-  depends_on = [docker_container.airflow_init, docker_container.orders_api, docker_container.azurite, docker_container.duckdb]
+  depends_on = [docker_container.airflow_init, docker_container.orders_api, docker_container.azurite, docker_container.duckdb, docker_container.reporting_permissions]
 }

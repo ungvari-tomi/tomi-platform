@@ -7,6 +7,9 @@ macro-paths: [macros]
 clean-targets: [target, dbt_packages]
 models:
   retailflow:
+    reporting:
+      +enabled: "{{ var('sales_reporting', false) }}"
+      +tags: [reporting]
     customers:
       +enabled: "{{ var('customer_pipeline', false) }}"
       +tags: [customers]
@@ -15,6 +18,9 @@ models:
       +tags: [parallel]
 data_tests:
   retailflow:
+    reporting:
+      +enabled: "{{ var('sales_reporting', false) }}"
+      +tags: [reporting]
     customers:
       +enabled: "{{ var('customer_pipeline', false) }}"
       +tags: [customers]

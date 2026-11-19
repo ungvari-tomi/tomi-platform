@@ -149,6 +149,11 @@ def plan_summary(plan: dict) -> dict:
         "docker_container.mailpit",
         "docker_network.inventory_stream[0]",
         "docker_network.inventory_host[0]",
+        "docker_volume.reporting[0]",
+        "docker_network.dashboard[0]",
+        "docker_image.dashboard[0]",
+        "docker_container.dashboard[0]",
+        "docker_container.reporting_permissions[0]",
         "docker_network.shipment_events[0]",
         "docker_volume.kafka[0]",
         "docker_image.kafka[0]",
@@ -276,6 +281,12 @@ def main() -> None:
         if env["TF_VAR_orders_dataset_version"] != "orders-v3":
             parser.error("Shipment references require the current orders-v3 batch profile")
     env["TF_VAR_parallel_ingestion_enabled"] = parallel_enabled
+    dashboard_enabled = env.get(
+        "RETAILFLOW_DASHBOARD_ENABLED", local.get("RETAILFLOW_DASHBOARD_ENABLED", "false")
+    )
+    if dashboard_enabled not in {"true", "false"}:
+        parser.error("Dashboard enablement must be true or false")
+    env["TF_VAR_dashboard_enabled"] = dashboard_enabled
     env["TF_VAR_event_interval_seconds"] = env.get(
         "RETAILFLOW_EVENT_INTERVAL_SECONDS", local.get("RETAILFLOW_EVENT_INTERVAL_SECONDS", "600")
     )

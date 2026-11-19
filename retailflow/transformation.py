@@ -16,6 +16,10 @@ def scheduled_build(
 ) -> dict:
     if customers and parallel:
         raise ValueError("Select only one opt-in dbt pipeline")
+    reporting = (
+        not (customers or parallel)
+        and os.environ.get("RETAILFLOW_DASHBOARD_ENABLED", "false") == "true"
+    )
     identity = hashlib.sha256(json.dumps([dag_id, run_id, try_number]).encode()).hexdigest()
     directory = (
         Path(os.environ.get("RETAILFLOW_DBT_ARTIFACT_DIR", "/opt/airflow/logs/dbt"))
@@ -51,12 +55,20 @@ def scheduled_build(
             "RETAILFLOW_EVENT_INTERVAL_SECONDS", "600"
         ),
     }
+    if reporting:
+        environment["RETAILFLOW_REPORTING_DIR"] = os.environ["RETAILFLOW_REPORTING_DIR"]
     subprocess.run(  # nosec B603
         [
             "/opt/dbt/venv/bin/python",
             "-I",
             "/opt/dbt/run.py",
-            "parallel-pipeline" if parallel else "customer-pipeline" if customers else "pipeline",
+            "parallel-pipeline"
+            if parallel
+            else "customer-pipeline"
+            if customers
+            else "reporting-pipeline"
+            if reporting
+            else "pipeline",
         ],
         env=environment,
         check=True,

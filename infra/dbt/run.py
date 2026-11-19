@@ -3,6 +3,7 @@
 import argparse
 import json
 import os
+import runpy
 import shutil
 
 # Fixed executable and argument lists; no shell is invoked.
@@ -27,6 +28,17 @@ def execute(action: str, database: Path, artifact_root: Path, *, lock_timeout: f
             ["test", "--select", "tag:freshness", "--vars", '{"check_freshness": true}'],
             ["build"],
         ],
+        "reporting-pipeline": [
+            ["source", "freshness"],
+            [
+                "test",
+                "--select",
+                "tag:freshness",
+                "--vars",
+                '{"check_freshness": true, "sales_reporting": true}',
+            ],
+            ["build", "--vars", '{"sales_reporting": true}'],
+        ],
         "customer-pipeline": [
             ["source", "freshness", "--select", "source:customer_demo"],
             ["test", "--select", "tag:customer_freshness"],
@@ -40,6 +52,8 @@ def execute(action: str, database: Path, artifact_root: Path, *, lock_timeout: f
     }
     if action not in commands:
         raise ValueError("Unsupported dbt action")
+    if action == "reporting-pipeline" and not os.environ.get("RETAILFLOW_REPORTING_DIR"):
+        raise ValueError("Reporting publication directory is required")
     database = database.resolve()
     executable = shutil.which("dbt")
     if not executable:
@@ -54,13 +68,20 @@ def execute(action: str, database: Path, artifact_root: Path, *, lock_timeout: f
         DBT_TARGET_PATH=str(invocation / "target"),
         DBT_LOG_PATH=str(invocation / "logs"),
     )
-    with FileLock(str(database) + ".lock", mode=0o660, timeout=lock_timeout):
+    with FileLock(str(database) + ".lock", mode=0o660, timeout=lock_timeout) as warehouse_lock:
         if not database.is_file():
             raise FileNotFoundError("Refusing to create an empty warehouse for dbt")
         for index, arguments in enumerate(commands[action]):
             command_env = dict(env)
             if (
-                action in {"freshness", "pipeline", "customer-pipeline", "parallel-pipeline"}
+                action
+                in {
+                    "freshness",
+                    "pipeline",
+                    "customer-pipeline",
+                    "parallel-pipeline",
+                    "reporting-pipeline",
+                }
                 and index < 2
             ):
                 phase = "source_freshness" if index == 0 else "freshness_tests"
@@ -86,6 +107,17 @@ def execute(action: str, database: Path, artifact_root: Path, *, lock_timeout: f
             )
             if result.returncode:
                 return result.returncode
+        if action == "reporting-pipeline":
+            # -I excludes the script directory: load this fixed baked-in module explicitly.
+            publisher = runpy.run_path(str(project.parent / "reporting.py"))["publish_report"]
+            publication = publisher(
+                database,
+                Path(os.environ["RETAILFLOW_REPORTING_DIR"]),
+                warehouse_lock=warehouse_lock,
+            )
+            (invocation / "report-publication.json").write_text(
+                json.dumps(publication, indent=2), encoding="utf-8"
+            )
     print(json.dumps({"action": action, "status": "success", "artifacts": str(invocation)}))
     return 0
 
@@ -100,6 +132,7 @@ def main() -> None:
             "build",
             "freshness",
             "pipeline",
+            "reporting-pipeline",
             "customer-pipeline",
             "parallel-pipeline",
         ],

@@ -12,6 +12,47 @@ TERRAFORM = ROOT / ".bootstrap/terraform/terraform.exe"
 EXECUTABLE = str(TERRAFORM) if TERRAFORM.is_file() else shutil.which("terraform")
 
 
+@pytest.mark.skipif(not EXECUTABLE, reason="Terraform CLI is required for real hash evaluation")
+def test_reporting_module_rebuilds_both_publisher_and_dashboard(tmp_path):
+    module = tmp_path / "infra/local"
+    module.mkdir(parents=True)
+    source = tmp_path / "infra/dbt/reporting.py"
+    source.parent.mkdir()
+    source.write_bytes((ROOT / "infra/dbt/reporting.py").read_bytes())
+    expressions = {}
+    for key, filename, field in [
+        ("publisher", "orchestration.tf", "reporting"),
+        ("reader", "dashboard.tf", "reader"),
+    ]:
+        lines = (ROOT / "infra/local" / filename).read_text(encoding="utf-8").splitlines()
+        expressions[key] = next(
+            line.split("=", 1)[1].strip()
+            for line in lines
+            if line.strip().split("=", 1)[0].strip() == field
+        )
+    (module / "main.tf").write_text(
+        "locals {\n" + "\n".join(f"{k} = {v}" for k, v in expressions.items()) + "\n}\n"
+    )
+
+    def hashes():
+        result = subprocess.run(
+            [EXECUTABLE, f"-chdir={module}", "console", "-no-color"],
+            input="jsonencode({publisher=local.publisher,reader=local.reader})\n",
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=30,
+        )
+        return json.loads(json.loads(result.stdout))
+
+    before = hashes()
+    with source.open("a") as output:
+        output.write("\n# isolated source edit\n")
+    after = hashes()
+    assert before["publisher"] == before["reader"]
+    assert all(before[key] != after[key] for key in before)
+
+
 @pytest.mark.skipif(not EXECUTABLE, reason="Terraform CLI is required for real path evaluation")
 @pytest.mark.parametrize(
     ("host_path", "expected"),
