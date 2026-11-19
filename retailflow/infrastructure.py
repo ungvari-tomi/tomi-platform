@@ -148,6 +148,7 @@ def plan_summary(plan: dict) -> dict:
         "docker_image.mailpit",
         "docker_container.mailpit",
         "docker_network.inventory_stream[0]",
+        "docker_network.inventory_host[0]",
         "docker_network.shipment_events[0]",
         "docker_volume.kafka[0]",
         "docker_image.kafka[0]",

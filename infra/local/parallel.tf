@@ -21,6 +21,17 @@ locals {
     "__init__.py", "api.py", "currencies.py", "customers.py", "blob_storage.py",
     "event_contracts.py", "event_ingestion.py", "event_runtime.py", "shipment_webhook.py"
   ]
+  shipment_key_path = abspath("${path.module}/../../.local-secrets/shipment-webhook.key")
+  # Docker Desktop reports Linux VM paths after reading Windows bind mounts.
+  shipment_key_mount_source = can(regex("^[A-Za-z]:/", local.shipment_key_path)) ? "/run/desktop/mnt/host/${lower(substr(local.shipment_key_path, 0, 1))}/${substr(local.shipment_key_path, 3, length(local.shipment_key_path) - 3)}" : local.shipment_key_path
+}
+
+resource "docker_network" "inventory_host" {
+  count    = var.parallel_ingestion_enabled ? 1 : 0
+  name     = "retailflow-inventory-host"
+  driver   = "bridge"
+  internal = false
+  lifecycle { prevent_destroy = true }
 }
 
 resource "docker_network" "inventory_stream" {
@@ -57,10 +68,15 @@ resource "docker_image" "kafka" {
 }
 
 resource "docker_container" "kafka" {
-  count          = var.parallel_ingestion_enabled ? 1 : 0
-  name           = "retailflow-kafka"
-  image          = docker_image.kafka[0].image_id
-  network_mode   = docker_network.inventory_stream[0].name
+  count = var.parallel_ingestion_enabled ? 1 : 0
+  name  = "retailflow-kafka"
+  image = docker_image.kafka[0].image_id
+  networks_advanced {
+    name = docker_network.inventory_stream[0].name
+  }
+  networks_advanced {
+    name = docker_network.inventory_host[0].name
+  }
   user           = "1000:1000"
   memory         = 1024
   memory_swap    = 1536
@@ -135,6 +151,7 @@ resource "docker_container" "inventory_topic" {
   must_run      = false
   start         = true
   memory        = 192
+  memory_swap   = 384
   security_opts = ["no-new-privileges:true"]
   capabilities { drop = ["ALL"] }
   depends_on = [docker_container.kafka]
@@ -196,7 +213,7 @@ resource "docker_container" "parallel" {
     for_each = startswith(each.key, "shipment-") ? [1] : []
     content {
       target    = "/run/retailflow-secrets/shipment-webhook.key"
-      source    = abspath("${path.module}/../../.local-secrets/shipment-webhook.key")
+      source    = local.shipment_key_mount_source
       type      = "bind"
       read_only = true
     }

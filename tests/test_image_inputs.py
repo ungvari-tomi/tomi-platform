@@ -12,6 +12,43 @@ TERRAFORM = ROOT / ".bootstrap/terraform/terraform.exe"
 EXECUTABLE = str(TERRAFORM) if TERRAFORM.is_file() else shutil.which("terraform")
 
 
+@pytest.mark.skipif(not EXECUTABLE, reason="Terraform CLI is required for real path evaluation")
+@pytest.mark.parametrize(
+    ("host_path", "expected"),
+    [
+        (
+            "C:/Users/Example User/.local-secrets/key",
+            "/run/desktop/mnt/host/c/Users/Example User/.local-secrets/key",
+        ),
+        ("D:/Users/Ungvári Tamás/key", "/run/desktop/mnt/host/d/Users/Ungvári Tamás/key"),
+        ("/home/Example User/key", "/home/Example User/key"),
+    ],
+)
+def test_shipment_bind_path_matches_docker_desktop_without_changing_linux_paths(
+    tmp_path, host_path, expected
+):
+    source = (ROOT / "infra/local/parallel.tf").read_text(encoding="utf-8")
+    expression = next(
+        line
+        for line in source.splitlines()
+        if line.strip().startswith("shipment_key_mount_source =")
+    )
+    (tmp_path / "main.tf").write_text(
+        "locals {\n shipment_key_path = " + json.dumps(host_path) + "\n" + expression + "\n}\n",
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        [EXECUTABLE, f"-chdir={tmp_path}", "console", "-no-color"],
+        input="jsonencode(local.shipment_key_mount_source)\n",
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        check=True,
+        timeout=30,
+    )
+    assert json.loads(json.loads(result.stdout)) == expected
+
+
 @pytest.mark.skipif(not EXECUTABLE, reason="Terraform CLI is required for real hash evaluation")
 def test_runtime_hashes_ignore_local_helpers_but_track_runtime_changes(tmp_path):
     module = tmp_path / "infra/local"

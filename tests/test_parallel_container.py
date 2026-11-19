@@ -2,6 +2,7 @@
 
 import os
 import re
+import socket
 import subprocess
 import time
 from uuid import uuid4
@@ -23,6 +24,7 @@ def cleanup_resources(network: str) -> None:
         ["docker", "rm", "--force", "--volumes", network + "-worker"],
         ["docker", "rm", "--force", "--volumes", network + "-broker"],
         ["docker", "network", "rm", network],
+        ["docker", "network", "rm", network + "-host"],
     ]
     for command in commands:
         try:
@@ -49,6 +51,10 @@ def test_real_kafka_resume_and_webhook_coexist_with_batch(tmp_path):
     name = "parallel-test-" + uuid4().hex
     broker_name = name + "-broker"
     worker_name = name + "-worker"
+    host_network = name + "-host"
+    with socket.socket() as listener:
+        listener.bind(("127.0.0.1", 0))
+        host_port = listener.getsockname()[1]
     database = tmp_path / "retailflow.duckdb"
     duckdb.connect(str(database)).close()
 
@@ -66,7 +72,7 @@ from confluent_kafka.admin import AdminClient, NewTopic
 from fastapi.testclient import TestClient
 from filelock import FileLock
 from retailflow.event_contracts import encode, generate
-from retailflow.event_runtime import TOPIC, consume_one, inventory_delivery
+from retailflow.event_runtime import TOPIC, consume_one, ensure_inventory_topic, inventory_delivery
 from retailflow.shipment_webhook import create_app, signature
 
 assert os.getuid()==10001
@@ -75,7 +81,8 @@ with FileLock(str(path)+'.lock',mode=0o660):
  with duckdb.connect(str(path)) as db:
   db.execute('CREATE SCHEMA raw; CREATE TABLE raw.batch_sentinel AS SELECT 42 AS value')
 admin=AdminClient({'bootstrap.servers':'retailflow-kafka:9092'})
-admin.create_topics([NewTopic(TOPIC,num_partitions=3,replication_factor=1)])[TOPIC].result(30)
+ensure_inventory_topic(admin)
+ensure_inventory_topic(admin)  # Existing valid topic is an idempotent startup.
 producer=Producer({'bootstrap.servers':'retailflow-kafka:9092','enable.idempotence':True})
 config={'bootstrap.servers':'retailflow-kafka:9092','group.id':'fixture-inventory',
         'enable.auto.commit':False,'enable.auto.offset.store':False,'auto.offset.reset':'earliest',
@@ -124,8 +131,9 @@ with FileLock(str(path)+'.lock',mode=0o660):
   assert db.execute('SELECT * FROM raw.batch_sentinel').fetchone()==(42,)
 print('PASS real Kafka resume, duplicates, webhook replay and preserved batch data')
 """
-    docker("network", "create", name)
+    docker("network", "create", "--internal", name)
     try:
+        docker("network", "create", host_network)
         docker(
             "run",
             "-d",
@@ -135,6 +143,10 @@ print('PASS real Kafka resume, duplicates, webhook replay and preserved batch da
             name,
             "--network-alias",
             "retailflow-kafka",
+            "--network",
+            host_network,
+            "--publish",
+            f"127.0.0.1:{host_port}:19092",
             "--memory",
             "768m",
             "--cap-drop",
@@ -150,13 +162,13 @@ print('PASS real Kafka resume, duplicates, webhook replay and preserved batch da
             "-e",
             "KAFKA_CONTROLLER_QUORUM_VOTERS=1@retailflow-kafka:9093",
             "-e",
-            "KAFKA_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093",
+            "KAFKA_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:19092",
             "-e",
-            "KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://retailflow-kafka:9092",
+            f"KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://retailflow-kafka:9092,EXTERNAL://127.0.0.1:{host_port}",
             "-e",
             "KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER",
             "-e",
-            "KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT",
+            "KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT",
             "-e",
             "KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1",
             "-e",
@@ -184,6 +196,8 @@ print('PASS real Kafka resume, duplicates, webhook replay and preserved batch da
             time.sleep(2)
         else:
             pytest.fail("Disposable Kafka did not become ready")
+        with socket.create_connection(("127.0.0.1", host_port), timeout=5):
+            pass
         with disposable_warehouse(database) as owner:
             output = docker(
                 "run",
@@ -208,5 +222,12 @@ print('PASS real Kafka resume, duplicates, webhook replay and preserved batch da
                 script,
             )
             assert "PASS real Kafka resume" in output
+        from confluent_kafka.admin import AdminClient
+
+        topic_name = "retailflow.inventory.v1"
+        metadata = AdminClient({"bootstrap.servers": f"127.0.0.1:{host_port}"}).list_topics(
+            topic_name, timeout=15
+        )
+        assert len(metadata.topics[topic_name].partitions) == 3
     finally:
         cleanup_resources(name)

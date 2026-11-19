@@ -1,8 +1,9 @@
 # Parallel batch, streaming and webhook ingestion
 
-Status: implemented and tested locally with disposable data; no Terraform apply
-or new schedule activation has occurred. The batch code, source contracts and
-historical namespaces remain intact. All infrastructure is local and opt-in.
+Status: deployed locally on 2026-11-19 through an owner-approved saved Terraform
+plan, after CI passed for commit `37b42a1`. Batch and event dbt pipelines passed
+against the managed warehouse. The batch code, source contracts and historical
+namespaces remain intact. All infrastructure is local and opt-in.
 
 ## Three sources, not three copies of orders
 
@@ -41,6 +42,10 @@ Only then does it synchronously commit offset+1. One-event landing units keep
 partition/offset identity stable across failures and rebalances. Invalid messages
 stop the consumer without skipping an offset; raw invalid bodies are not copied
 to logs or an unvalidated dead-letter archive. Restart replays uncommitted data.
+The prepared contention fix waits on the same polled event while another writer
+holds the warehouse lock, without polling forward or committing its offset. A
+shutdown during that wait leaves it uncommitted. The consumer's maximum poll
+interval is fifteen minutes, allowing the bounded dbt wrapper to finish normally.
 
 Shipment transitions use an HMAC-SHA256 signed body and delivery timestamp, with
 a five-minute acceptance window and 16 KiB body limit. The endpoint returns 202
@@ -63,7 +68,15 @@ defaults to false (`RETAILFLOW_PARALLEL_INGESTION_ENABLED`). It prepares:
 - A three-partition `retailflow.inventory.v1` topic and one-shot topic initializer.
 - Separate inventory producer, inventory consumer, shipment simulator and webhook containers.
 - Isolated stream/webhook networks and protected Kafka/source-state volumes.
+- A separate host-access bridge attached only to Kafka for its loopback listener.
 - Loopback-only Kafka 19092 and webhook 18090; controller ports stay internal.
+
+The host-access bridge and bounded topic-readiness retry are prepared fixes,
+pending publication, CI and a separately approved deployment. They preserve the
+internal worker network and the existing broker data volume/cluster identity.
+The broker's additional bridge permits outbound connectivity; it receives no
+blob credential or webhook key. Worker network isolation remains unchanged.
+An existing topic with a different partition count is rejected without alteration.
 
 Workers are read-only, non-root UID/GID 10001 with dropped capabilities. The Kafka
 image runs as UID 1000 and needs writable startup configuration paths; this is a
@@ -89,6 +102,11 @@ environment, `.env`, then defaults. Worker settings use the same priority. Edits
 require container restart/reviewed deployment to take effect. Broker/webhook
 outbound destinations are restricted to explicit loopback or Docker-local names;
 HTTP proxies and redirects are disabled.
+For a Windows-hosted Terraform CLI and the Docker Desktop Linux engine, the
+prepared configuration normalizes the bind source to Docker Desktop's reported
+`/run/desktop/mnt/host/<drive>/...` path. Linux-hosted paths remain unchanged.
+The mount stays read-only and scoped to the two shipment services; it is not
+ignored by Terraform lifecycle rules.
 
 ## dbt analytics
 
@@ -137,6 +155,46 @@ before deployment alongside the existing Airflow services. No mandatory cloud
 service, subscription, trial or chargeable resource is introduced.
 
 ## Validation and deployment boundary
+
+The 2026-11-19 deployment preserved every existing data volume, verified all
+2,948 pre-existing blobs after apply, and retained a locked warehouse snapshot
+plus an offline Azurite volume copy. Before new ingestion, the original warehouse
+still contained all 1,433 orders, 55 FX rates and 1,465 batch ledger entries.
+Deployment verification then loaded 1,334 additional orders and nine FX rates,
+and confirmed both a Kafka inventory event and a signed shipment webhook had
+committed through their independent landing paths. Batch dbt built three models
+and passed 37 tests; parallel dbt built four models and passed 14 tests. Both
+pipelines also passed their separate source and data freshness checks.
+The original orders/FX schedules were restored and the verified parallel
+analytics schedule enabled. Customer ingestion remains disabled and its DAG
+paused. One manual verification run per enabled DAG was also queued; direct
+pipeline verification and an orchestrated run's final status are separate evidence.
+All three deployment verification DAG runs subsequently finished successfully:
+orders, Frankfurter exchange rates and parallel event analytics.
+
+The first topic initializer exited because its immediate metadata check did not
+observe three partitions after creation. Broker inspection confirmed all three
+partitions, and retrying the unchanged initializer succeeded. This startup race
+still needs a bounded metadata retry in a future image update; do not reset the
+topic or discard existing offsets to recover it. The review, backups and
+deployment evidence are retained under ignored `artifacts/` directories. The
+earlier preparation notes below describe the pre-deployment history.
+
+The post-apply check also found unresolved infrastructure drift: Docker recorded
+the Kafka loopback port binding but did not expose a reachable host listener on
+19092. Internal broker traffic and warehouse ingestion work. Terraform proposes
+replacing the broker for that port difference, updating Windows-normalized
+signing-key mount paths, and normalizing the initializer's swap setting. That
+follow-up plan was saved but **not applied**. Do not treat this deployment as
+drift-free or use the host Kafka endpoint until this is resolved through another
+reviewed change. The webhook, orders API, Airflow and Mailpit host ports were
+reachable during verification.
+
+The follow-up fixes passed focused regression tests and a real disposable Kafka
+test covering cold topic creation, idempotent reinitialization, internal delivery,
+loopback metadata access, duplicate handling, consumer resume and webhook replay.
+The changed runtime and Terraform configuration have not yet replaced the live
+containers. The original deployment limitations above remain until that apply.
 
 Unit tests cover signed requests, contract rejection, frozen retries, checksum
 failures, offset acknowledgement order, duplicate/conflicting events and batch

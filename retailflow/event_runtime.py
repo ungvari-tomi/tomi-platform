@@ -11,7 +11,7 @@ from threading import Event
 
 import httpx
 from dotenv import dotenv_values
-from filelock import FileLock
+from filelock import FileLock, Timeout
 
 from retailflow.api import EPOCH
 from retailflow.blob_storage import BlobStore
@@ -84,7 +84,45 @@ def source_step(
         return sequence
 
 
-def consume_one(consumer, store, database: Path, *, timeout: float = 1) -> bool:
+def ensure_inventory_topic(admin, *, timeout: float = 60) -> None:
+    """Wait for usable metadata after creation; never change an existing partition count."""
+    from confluent_kafka import KafkaError, KafkaException
+    from confluent_kafka.admin import NewTopic
+
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        remaining = deadline - time.monotonic()
+        try:
+            topics = admin.list_topics(timeout=min(5, remaining)).topics
+            topic = topics.get(TOPIC)
+            if topic is None:
+                try:
+                    admin.create_topics([NewTopic(TOPIC, num_partitions=3, replication_factor=1)])[
+                        TOPIC
+                    ].result(min(10, remaining))
+                except KafkaException as error:
+                    if error.args[0].code() != KafkaError.TOPIC_ALREADY_EXISTS:
+                        raise
+            elif topic.error is None and topic.partitions:
+                if set(topic.partitions) != {0, 1, 2}:
+                    raise ValueError("Inventory topic must retain its three-partition contract")
+                if all(partition.leader >= 0 for partition in topic.partitions.values()):
+                    return
+            elif topic.error is not None and topic.error.code() not in {
+                KafkaError.UNKNOWN_TOPIC_OR_PART,
+                KafkaError.LEADER_NOT_AVAILABLE,
+            }:
+                raise RuntimeError("Inventory topic metadata was rejected")
+        except (KafkaException, TimeoutError):
+            # Broker startup and metadata propagation are bounded by the same deadline.
+            pass
+        time.sleep(min(1, max(0, deadline - time.monotonic())))
+    raise RuntimeError("Inventory topic did not become ready before the deadline")
+
+
+def consume_one(
+    consumer, store, database: Path, *, timeout: float = 1, stopped: Event | None = None
+) -> bool:
     message = consumer.poll(timeout)
     if message is None:
         return False
@@ -95,9 +133,26 @@ def consume_one(consumer, store, database: Path, *, timeout: float = 1) -> bool:
     event = decode(message.value())
     if not isinstance(event, InventoryMovement):
         raise ValueError("Non-inventory event on inventory stream")
-    ingest(
-        store, event, database, topic=TOPIC, partition=message.partition(), offset=message.offset()
-    )
+    while True:
+        if stopped is not None and stopped.is_set():
+            return False
+        try:
+            ingest(
+                store,
+                event,
+                database,
+                topic=TOPIC,
+                partition=message.partition(),
+                offset=message.offset(),
+            )
+            break
+        except Timeout:
+            # Keep this exact message: polling again could skip its uncommitted offset.
+            if stopped is not None:
+                if stopped.wait(1):
+                    return False
+            else:
+                time.sleep(1)
     positions = consumer.commit(message=message, asynchronous=False) or []
     if any(position.error for position in positions):
         raise RuntimeError("Kafka offset commit was not acknowledged")
@@ -144,16 +199,10 @@ def main() -> None:
     for number in (signal.SIGINT, signal.SIGTERM):
         signal.signal(number, lambda *_: stopped.set())
     if args.role == "init-topics":
-        from confluent_kafka.admin import AdminClient, NewTopic
+        from confluent_kafka.admin import AdminClient
 
         admin = AdminClient({"bootstrap.servers": broker()})
-        topics = admin.list_topics(timeout=15).topics
-        if TOPIC not in topics:
-            admin.create_topics([NewTopic(TOPIC, num_partitions=3, replication_factor=1)])[
-                TOPIC
-            ].result(30)
-        if len(admin.list_topics(TOPIC, timeout=15).topics[TOPIC].partitions) != 3:
-            raise ValueError("Inventory topic must retain its three-partition contract")
+        ensure_inventory_topic(admin)
         return
     if args.role == "inventory-consumer":
         from confluent_kafka import Consumer
@@ -166,6 +215,7 @@ def main() -> None:
                 "enable.auto.offset.store": False,
                 "auto.offset.reset": "earliest",
                 "allow.auto.create.topics": False,
+                "max.poll.interval.ms": 900000,
             }
         )
         store = BlobStore()
@@ -173,7 +223,9 @@ def main() -> None:
             store.ensure_container()
             consumer.subscribe([TOPIC])
             while not stopped.is_set():
-                consume_one(consumer, store, Path(os.environ["RETAILFLOW_DUCKDB_PATH"]))
+                consume_one(
+                    consumer, store, Path(os.environ["RETAILFLOW_DUCKDB_PATH"]), stopped=stopped
+                )
         finally:
             consumer.close()
             store.close()

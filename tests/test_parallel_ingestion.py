@@ -2,6 +2,9 @@
 
 import json
 from datetime import UTC, datetime, timedelta
+from threading import Event
+from types import SimpleNamespace
+from unittest.mock import Mock
 
 import duckdb
 import pytest
@@ -17,6 +20,7 @@ from retailflow.event_ingestion import ingest, land_event, load_event
 from retailflow.event_runtime import (
     TOPIC,
     consume_one,
+    ensure_inventory_topic,
     inventory_delivery,
     shipment_delivery,
     source_step,
@@ -181,6 +185,87 @@ def test_producer_requires_successful_delivery_callback():
         inventory_delivery(Producer(), generate("inventory-v1", 1))
 
 
+def topic_metadata(partitions=3, *, leader=1):
+    return SimpleNamespace(
+        topics={
+            TOPIC: SimpleNamespace(
+                error=None,
+                partitions={index: SimpleNamespace(leader=leader) for index in range(partitions)},
+            )
+        }
+    )
+
+
+def test_topic_creation_waits_for_metadata_and_partition_leaders(monkeypatch):
+    from retailflow import event_runtime
+
+    monkeypatch.setattr(event_runtime.time, "sleep", lambda _: None)
+    admin = Mock()
+    admin.list_topics.side_effect = [
+        SimpleNamespace(topics={}),
+        topic_metadata(0),
+        topic_metadata(leader=-1),
+        topic_metadata(),
+    ]
+    created = Mock()
+    admin.create_topics.return_value = {TOPIC: created}
+    ensure_inventory_topic(admin)
+    assert admin.list_topics.call_count == 4
+    assert admin.create_topics.call_count == 1
+    created.result.assert_called_once()
+
+
+def test_topic_creation_rejects_existing_wrong_partition_contract():
+    admin = Mock()
+    admin.list_topics.return_value = topic_metadata(1)
+    with pytest.raises(ValueError, match="three-partition"):
+        ensure_inventory_topic(admin)
+    admin.create_topics.assert_not_called()
+
+
+def test_topic_creation_has_bounded_metadata_deadline(monkeypatch):
+    from retailflow import event_runtime
+
+    clock = [0.0]
+    monkeypatch.setattr(event_runtime.time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(
+        event_runtime.time, "sleep", lambda seconds: clock.__setitem__(0, clock[0] + seconds)
+    )
+    admin = Mock()
+    admin.list_topics.return_value = topic_metadata(0)
+    with pytest.raises(RuntimeError, match="deadline"):
+        ensure_inventory_topic(admin, timeout=2)
+    assert admin.list_topics.call_count == 2
+
+
+def test_consumer_retries_same_message_on_warehouse_contention(database, monkeypatch):
+    from retailflow import event_runtime
+
+    monkeypatch.setattr(event_runtime.time, "sleep", lambda _: None)
+    consumer = Consumer(encode(generate("inventory-v1", 1)))
+    consumer.poll = Mock(wraps=consumer.poll)
+    writer = Mock(side_effect=[Timeout("warehouse"), Timeout("warehouse"), {}])
+    monkeypatch.setattr(event_runtime, "ingest", writer)
+    assert consume_one(consumer, MemoryStore(), database)
+    assert consumer.poll.call_count == 1 and consumer.commits == 1
+    assert writer.call_args_list[0] == writer.call_args_list[1] == writer.call_args_list[2]
+
+
+def test_consumer_shutdown_during_contention_does_not_commit(database, monkeypatch):
+    from retailflow import event_runtime
+
+    stopped = Event()
+    consumer = Consumer(encode(generate("inventory-v1", 1)))
+
+    def blocked(*args, **kwargs):
+        stopped.set()
+        raise Timeout("warehouse")
+
+    monkeypatch.setattr(event_runtime, "ingest", blocked)
+    assert not consume_one(consumer, MemoryStore(), database, stopped=stopped)
+    assert consumer.commits == 0
+
+
 def test_signed_webhook_retries_replay_and_rejects_invalid_input(database):
     store = MemoryStore()
     key = bytes(range(32))
@@ -262,7 +347,7 @@ def test_cleanup_attempts_all_disposable_resources_and_reports_backend_failure(m
     monkeypatch.setattr(subprocess, "run", failed)
     with pytest.raises(RuntimeError, match="cleanup failed"):
         cleanup_resources("parallel-test-" + "a" * 32)
-    assert len(commands) == 3
+    assert len(commands) == 4
     with pytest.raises(ValueError, match="restricted"):
         cleanup_resources("retailflow-kafka")
-    assert len(commands) == 3
+    assert len(commands) == 4

@@ -185,3 +185,18 @@ def test_review_directory_must_stay_in_ignored_artifacts(monkeypatch, tmp_path):
     )
     with pytest.raises(SystemExit):
         infrastructure.main()
+
+
+def test_kafka_host_network_creation_allowed_but_deletion_rejected():
+    address = "docker_network.inventory_host[0]"
+    assert infrastructure.plan_summary(
+        {"resource_changes": [{"address": address, "change": {"actions": ["create"]}}]}
+    )["creates"] == [address]
+    with pytest.raises(ValueError, match="deletes data storage or networking"):
+        infrastructure.plan_summary(
+            {
+                "resource_changes": [
+                    {"address": address, "change": {"actions": ["delete", "create"]}}
+                ]
+            }
+        )

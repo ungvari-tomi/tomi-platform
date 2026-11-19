@@ -40,14 +40,14 @@ the extraction, loading and dbt steps as one workflow for each source.
 
 ## Three parallel ingestion paths
 
-The streaming/event extension is prepared locally and is **not deployed**. It
-keeps the existing batch pipelines and adds two independently generated datasets:
+The streaming/event extension is deployed locally alongside the existing batch
+pipelines, adding two independently generated datasets:
 
 | Path | Data | Ingestion |
 | --- | --- | --- |
 | Batch — existing | Orders/customers and Frankfurter exchange rates | Scheduled API calls through Airflow |
-| Streaming — prepared | Synthetic inventory movements | Kafka producer and continuous consumer |
-| Event-driven — prepared | Synthetic shipment status changes | Authenticated webhook on each transition |
+| Streaming — deployed locally | Synthetic inventory movements | Kafka producer and continuous consumer |
+| Event-driven — deployed locally | Synthetic shipment status changes | Authenticated webhook on each transition |
 
 ```mermaid
 flowchart LR
