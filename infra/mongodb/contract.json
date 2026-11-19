@@ -1,0 +1,343 @@
+{
+  "indexes": [
+    {
+      "key": {
+        "sku": 1
+      },
+      "name": "sku_unique",
+      "unique": true
+    },
+    {
+      "key": {
+        "category": 1,
+        "markets": 1,
+        "status": 1
+      },
+      "name": "category_market_status"
+    },
+    {
+      "key": {
+        "_id": 1,
+        "updated_at": 1
+      },
+      "name": "incremental_cursor"
+    },
+    {
+      "key": {
+        "variants.sku": 1
+      },
+      "name": "variant_sku_unique",
+      "unique": true
+    }
+  ],
+  "validationAction": "error",
+  "validationLevel": "strict",
+  "validator": {
+    "$and": [
+      {
+        "$jsonSchema": {
+          "additionalProperties": false,
+          "bsonType": "object",
+          "oneOf": [
+            {
+              "properties": {
+                "attributes": {
+                  "additionalProperties": false,
+                  "bsonType": "object",
+                  "properties": {
+                    "power_watts": {
+                      "bsonType": "int",
+                      "maximum": 500,
+                      "minimum": 1
+                    },
+                    "warranty_months": {
+                      "bsonType": "int",
+                      "enum": [
+                        12,
+                        24,
+                        36
+                      ]
+                    }
+                  },
+                  "required": [
+                    "power_watts",
+                    "warranty_months"
+                  ]
+                },
+                "category": {
+                  "enum": [
+                    "electronics"
+                  ]
+                },
+                "variants": {
+                  "items": {
+                    "properties": {
+                      "option": {
+                        "enum": [
+                          "black",
+                          "white"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "properties": {
+                "attributes": {
+                  "additionalProperties": false,
+                  "bsonType": "object",
+                  "properties": {
+                    "care_temperature_c": {
+                      "bsonType": "int",
+                      "enum": [
+                        30,
+                        40
+                      ]
+                    },
+                    "fabric": {
+                      "enum": [
+                        "cotton",
+                        "linen"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "fabric",
+                    "care_temperature_c"
+                  ]
+                },
+                "category": {
+                  "enum": [
+                    "apparel"
+                  ]
+                },
+                "variants": {
+                  "items": {
+                    "properties": {
+                      "option": {
+                        "enum": [
+                          "M",
+                          "L"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "properties": {
+                "attributes": {
+                  "additionalProperties": false,
+                  "bsonType": "object",
+                  "properties": {
+                    "dishwasher_safe": {
+                      "bsonType": "bool"
+                    },
+                    "material": {
+                      "enum": [
+                        "ceramic",
+                        "glass"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "material",
+                    "dishwasher_safe"
+                  ]
+                },
+                "category": {
+                  "enum": [
+                    "homeware"
+                  ]
+                },
+                "variants": {
+                  "items": {
+                    "properties": {
+                      "option": {
+                        "enum": [
+                          "black",
+                          "white"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "_id": {
+              "bsonType": "string",
+              "pattern": "^product-(00[1-9]|01[0-9]|020)$"
+            },
+            "attributes": {
+              "bsonType": "object"
+            },
+            "category": {
+              "enum": [
+                "electronics",
+                "apparel",
+                "homeware"
+              ]
+            },
+            "classification": {
+              "enum": [
+                "synthetic_product_metadata"
+              ]
+            },
+            "created_at": {
+              "bsonType": "date"
+            },
+            "markets": {
+              "bsonType": "array",
+              "items": {
+                "enum": [
+                  "HU",
+                  "DE",
+                  "FR",
+                  "PL",
+                  "CZ",
+                  "RO",
+                  "GB",
+                  "CH",
+                  "SE",
+                  "NO",
+                  "DK"
+                ]
+              },
+              "maxItems": 11,
+              "minItems": 1,
+              "uniqueItems": true
+            },
+            "name": {
+              "bsonType": "string",
+              "maxLength": 120,
+              "minLength": 1
+            },
+            "revision": {
+              "bsonType": "int",
+              "minimum": 1
+            },
+            "schema_version": {
+              "bsonType": "int",
+              "enum": [
+                1
+              ]
+            },
+            "sku": {
+              "bsonType": "string",
+              "pattern": "^RF-00(0[1-9]|1[0-9]|20)$"
+            },
+            "status": {
+              "enum": [
+                "active",
+                "retired"
+              ]
+            },
+            "synthetic": {
+              "enum": [
+                true
+              ]
+            },
+            "updated_at": {
+              "bsonType": "date"
+            },
+            "variants": {
+              "bsonType": "array",
+              "items": {
+                "additionalProperties": false,
+                "bsonType": "object",
+                "properties": {
+                  "option": {
+                    "bsonType": "string",
+                    "maxLength": 120,
+                    "minLength": 1
+                  },
+                  "sku": {
+                    "bsonType": "string",
+                    "pattern": "^RF-00(0[1-9]|1[0-9]|20)-(A|B)$"
+                  }
+                },
+                "required": [
+                  "sku",
+                  "option"
+                ]
+              },
+              "maxItems": 2,
+              "minItems": 1,
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "_id",
+            "sku",
+            "name",
+            "category",
+            "attributes",
+            "variants",
+            "markets",
+            "schema_version",
+            "revision",
+            "synthetic",
+            "classification",
+            "status",
+            "created_at",
+            "updated_at"
+          ]
+        }
+      },
+      {
+        "$expr": {
+          "$and": [
+            {
+              "$gte": [
+                "$updated_at",
+                "$created_at"
+              ]
+            },
+            {
+              "$eq": [
+                {
+                  "$size": {
+                    "$cond": [
+                      {
+                        "$isArray": "$variants"
+                      },
+                      "$variants",
+                      []
+                    ]
+                  }
+                },
+                {
+                  "$size": {
+                    "$setUnion": [
+                      {
+                        "$map": {
+                          "as": "variant",
+                          "in": "$$variant.sku",
+                          "input": {
+                            "$cond": [
+                              {
+                                "$isArray": "$variants"
+                              },
+                              "$variants",
+                              []
+                            ]
+                          }
+                        }
+                      },
+                      []
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

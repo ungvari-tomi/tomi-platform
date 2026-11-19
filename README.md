@@ -64,6 +64,15 @@ The new paths do not republish orders or add them to revenue totals. Inventory
 references existing product IDs; shipments reference generated order IDs without
 customer names or addresses. [Parallel ingestion design, tests and deployment](docs/parallel-ingestion.md).
 
+## Prepared product catalog
+
+A MongoDB Community product catalog is implemented and tested in disposable
+storage, but is **not deployed**. It deterministically covers the existing 20
+product IDs with electronics, apparel and homeware documents. Its independent
+Terraform root, authentication, schema validation, indexes and recovery drill
+leave the deployed pipelines and protected volumes unchanged. Catalog extraction
+and warehouse enrichment are later milestones. See the [catalog design and runbook](docs/mongodb-catalog.md).
+
 ## What each part does
 
 | Part | Its job |
@@ -152,6 +161,8 @@ explicit missing-rate coverage. It reads independent verified aggregate snapshot
 This milestone is deployed locally. See the [dashboard guide](docs/dashboard.md).
 
 **Future:** inventory and shipment dashboard pages and richer reporting navigation.
+The product catalog roadmap adds verified JSON extraction and dbt enrichment;
+replica-set change streams remain a separate advanced milestone.
 Optional Azure/Snowflake targets remain future possibilities; the current platform
 is a local engineering project, not a production cloud deployment.
 

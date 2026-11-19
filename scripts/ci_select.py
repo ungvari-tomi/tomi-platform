@@ -27,7 +27,14 @@ def select(paths: list[str], *, full: bool = False) -> dict:
     for path in paths:
         if path == "AGENTS.md" or path == "README.md" or path.startswith("docs/"):
             continue
-        if path == "retailflow/infrastructure.py":
+        if path.startswith("infra/mongodb/"):
+            flags["checks"] = flags["integration"] = True
+            flags["terraform"] |= "/terraform/" in path
+            flags["dependencies"] |= path.endswith(
+                ("uv.lock", "pyproject.toml", "requirements.txt")
+            )
+            targets.update({"tests/test_mongodb_catalog.py", "tests/test_mongodb_container.py"})
+        elif path == "retailflow/infrastructure.py":
             flags["checks"] = flags["terraform"] = True
             targets.update({"tests/test_infrastructure.py", "tests/test_release_review.py"})
         elif path in {".sqlfluff", ".sqlfluffignore"}:
@@ -72,6 +79,7 @@ def select(paths: list[str], *, full: bool = False) -> dict:
                     "RETAILFLOW_TEST_MAILPIT_IMAGE",
                     "RETAILFLOW_TEST_PARALLEL_IMAGES",
                     "RETAILFLOW_TEST_DASHBOARD_IMAGE",
+                    "RETAILFLOW_TEST_MONGODB_IMAGE",
                 )
             ):
                 flags["integration"] = True

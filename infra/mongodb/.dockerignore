@@ -1,0 +1,9 @@
+*
+!server.Dockerfile
+!client.Dockerfile
+!catalog.py
+!requirements.txt
+!contract.json
+!init.js
+!health.js
+!backup.js

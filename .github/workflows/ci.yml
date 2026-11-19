@@ -76,7 +76,7 @@ jobs:
       - name: SQL lint
         run: uv run --locked sqlfluff lint infra/dbt/project
       - name: Python security checks
-        run: uv run --locked bandit -r retailflow dags infra/duckdb infra/dbt/run.py infra/dbt/reporting.py infra/dashboard/app.py infra/orchestration/start.py scripts -q
+        run: uv run --locked bandit -r retailflow dags infra/duckdb infra/dbt/run.py infra/dbt/reporting.py infra/dashboard/app.py infra/mongodb/catalog.py infra/orchestration/start.py scripts -q
       - name: Tests
         env:
           RETAILFLOW_SELECTED_TESTS: ${{ needs.changes.outputs.tests }}
@@ -116,6 +116,12 @@ jobs:
         if: needs.changes.outputs.terraform == 'true'
       - run: terraform -chdir=infra/local validate
         if: needs.changes.outputs.terraform == 'true'
+      - name: Validate isolated catalog infrastructure
+        if: needs.changes.outputs.terraform == 'true'
+        run: |
+          terraform -chdir=infra/mongodb/terraform fmt -check
+          terraform -chdir=infra/mongodb/terraform init -backend=false -input=false -lockfile=readonly
+          terraform -chdir=infra/mongodb/terraform validate
       - name: Test image rebuild boundaries with Terraform
         if: needs.changes.outputs.terraform == 'true'
         run: uv run --locked python -m pytest tests/test_image_inputs.py -q -p no:cacheprovider
@@ -126,9 +132,11 @@ jobs:
           uv export --locked --no-dev --no-emit-project --format requirements-txt --output-file "$RUNNER_TEMP/root-requirements.txt" --quiet
           uv export --project infra/dbt --locked --no-dev --no-emit-project --format requirements-txt --output-file "$RUNNER_TEMP/dbt-requirements.txt" --quiet
           uv export --project infra/dashboard --locked --no-dev --no-emit-project --format requirements-txt --output-file "$RUNNER_TEMP/dashboard-requirements.txt" --quiet
+          uv export --project infra/mongodb --locked --no-dev --no-emit-project --format requirements-txt --output-file "$RUNNER_TEMP/catalog-requirements.txt" --quiet
           uv run --locked pip-audit --disable-pip --require-hashes -r "$RUNNER_TEMP/root-requirements.txt"
           uv run --locked pip-audit --disable-pip --require-hashes -r "$RUNNER_TEMP/dbt-requirements.txt"
           uv run --locked pip-audit --disable-pip --require-hashes -r "$RUNNER_TEMP/dashboard-requirements.txt"
+          uv run --locked pip-audit --disable-pip --require-hashes -r "$RUNNER_TEMP/catalog-requirements.txt"
 
   integration:
     needs: changes
@@ -144,6 +152,7 @@ jobs:
       RETAILFLOW_TEST_MAILPIT_IMAGE: "1"
       RETAILFLOW_TEST_PARALLEL_IMAGES: "1"
       RETAILFLOW_TEST_DASHBOARD_IMAGE: "1"
+      RETAILFLOW_TEST_MONGODB_IMAGE: "1"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -173,6 +182,8 @@ jobs:
           docker build --provenance=false --file infra/orchestration/airflow.Dockerfile --tag retailflow-airflow:validation .
           docker build --provenance=false --file infra/parallel/Dockerfile --tag retailflow-parallel:validation .
           docker build --provenance=false --file infra/dashboard/Dockerfile --tag retailflow-dashboard:validation .
+          docker build --provenance=false --file infra/mongodb/server.Dockerfile --tag retailflow-mongodb:validation infra/mongodb
+          docker build --provenance=false --file infra/mongodb/client.Dockerfile --tag retailflow-catalog:validation infra/mongodb
       - name: Selected tests using disposable data
         env:
           RETAILFLOW_SELECTED_TESTS: ${{ needs.changes.outputs.tests }}

@@ -12,6 +12,16 @@ def test_documentation_only_skips_runtime_jobs():
     assert selected["tests"] == []
 
 
+def test_catalog_changes_select_isolated_contract_and_integration_tests():
+    selected = ci_select.select(["infra/mongodb/catalog.py"])
+    assert selected["checks"] and selected["integration"]
+    assert not selected["dependencies"] and not selected["terraform"]
+    assert selected["tests"] == ["tests/test_mongodb_catalog.py", "tests/test_mongodb_container.py"]
+    assert ci_select.select(["infra/mongodb/terraform/main.tf"])["terraform"]
+    assert ci_select.select(["infra/mongodb/uv.lock"])["dependencies"]
+    assert ci_select.select(["tests/test_mongodb_container.py"])["integration"]
+
+
 @pytest.mark.parametrize("path", [".sqlfluff", ".sqlfluffignore"])
 def test_sql_lint_configuration_selects_style_checks_without_images(path):
     selected = ci_select.select([path])
