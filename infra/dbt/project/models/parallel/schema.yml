@@ -1,0 +1,40 @@
+version: 2
+models:
+  - name: stg_inventory_movements
+    description: Distinct streaming stock movements, without customer details or revenue duplication.
+    columns:
+      - name: event_id
+        data_tests: [not_null, unique]
+      - name: product_id
+        data_tests: [not_null]
+      - name: quantity_delta
+        data_tests: [not_null]
+      - name: reason
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [sale, restock, return]
+  - name: stg_shipment_updates
+    description: Individually authenticated shipment transitions received through webhooks.
+    columns:
+      - name: event_id
+        data_tests: [not_null, unique]
+      - name: order_id
+        data_tests: [not_null]
+      - name: shipment_id
+        data_tests: [not_null]
+      - name: status
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [dispatched, in_transit, delivered]
+  - name: inventory_net_movements
+    data_tests:
+      - unique_business_key:
+          arguments:
+            columns: [seed, interval_seconds, product_id, warehouse_id]
+  - name: latest_shipment_status
+    data_tests:
+      - unique_business_key:
+          arguments:
+            columns: [seed, interval_seconds, order_interval_seconds, shipment_id]

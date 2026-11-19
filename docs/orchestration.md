@@ -1,5 +1,8 @@
 # Terraform-managed Airflow extraction and loading
 
+[Parallel inventory streaming and shipment webhooks](parallel-ingestion.md) are
+an opt-in extension with a separate paused analytics DAG; deployment is pending.
+
 The [customer extension](customer-pipeline.md) is prepared locally with a separate
 paused DAG. It is not part of the deployed status described below.
 

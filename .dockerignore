@@ -12,6 +12,9 @@ retailflow/infrastructure.py
 !infra/orchestration/constraints.txt
 !infra/orchestration/start.py
 !infra/orchestration/duckdb-requirements.txt
+!infra/parallel/
+!infra/parallel/Dockerfile
+!infra/parallel/requirements.txt
 !infra/dbt/
 !infra/dbt/requirements.txt
 !infra/dbt/run.py

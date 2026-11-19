@@ -10,8 +10,14 @@ models:
     customers:
       +enabled: "{{ var('customer_pipeline', false) }}"
       +tags: [customers]
+    parallel:
+      +enabled: "{{ var('parallel_ingestion', false) }}"
+      +tags: [parallel]
 data_tests:
   retailflow:
     customers:
       +enabled: "{{ var('customer_pipeline', false) }}"
       +tags: [customers]
+    parallel:
+      +enabled: "{{ var('parallel_ingestion', false) }}"
+      +tags: [parallel]

@@ -13,6 +13,7 @@ dependencies = [
     "pytz",
     "python-dotenv",
     "uvicorn",
+    "confluent-kafka>=2.16.2",
 ]
 
 [dependency-groups]

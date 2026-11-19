@@ -11,7 +11,11 @@ from pathlib import Path
 from uuid import uuid4
 
 
-def scheduled_build(dag_id: str, run_id: str, try_number: int, *, customers: bool = False) -> dict:
+def scheduled_build(
+    dag_id: str, run_id: str, try_number: int, *, customers: bool = False, parallel: bool = False
+) -> dict:
+    if customers and parallel:
+        raise ValueError("Select only one opt-in dbt pipeline")
     identity = hashlib.sha256(json.dumps([dag_id, run_id, try_number]).encode()).hexdigest()
     directory = (
         Path(os.environ.get("RETAILFLOW_DBT_ARTIFACT_DIR", "/opt/airflow/logs/dbt"))
@@ -43,13 +47,16 @@ def scheduled_build(dag_id: str, run_id: str, try_number: int, *, customers: boo
         "RETAILFLOW_CUSTOMER_PRIVACY_KEY_ID": os.environ.get(
             "RETAILFLOW_CUSTOMER_PRIVACY_KEY_ID", "local-v1"
         ),
+        "RETAILFLOW_EVENT_INTERVAL_SECONDS": os.environ.get(
+            "RETAILFLOW_EVENT_INTERVAL_SECONDS", "600"
+        ),
     }
     subprocess.run(  # nosec B603
         [
             "/opt/dbt/venv/bin/python",
             "-I",
             "/opt/dbt/run.py",
-            "customer-pipeline" if customers else "pipeline",
+            "parallel-pipeline" if parallel else "customer-pipeline" if customers else "pipeline",
         ],
         env=environment,
         check=True,
@@ -69,7 +76,7 @@ def scheduled_build(dag_id: str, run_id: str, try_number: int, *, customers: boo
         if len(paths) != 1:
             raise RuntimeError("Missing dbt freshness evidence")
         checks = json.loads(paths[0].read_text(encoding="utf-8"))["results"]
-        expected = 1 if customers and phase == "freshness_tests" else 2
+        expected = 1 if (customers or parallel) and phase == "freshness_tests" else 2
         if len(checks) != expected or any(row["status"] != "pass" for row in checks):
             raise RuntimeError("dbt freshness checks did not all pass")
     return {
@@ -77,5 +84,5 @@ def scheduled_build(dag_id: str, run_id: str, try_number: int, *, customers: boo
         "models_succeeded": sum(row["unique_id"].startswith("model.") for row in records),
         "tests_passed": sum(row["unique_id"].startswith("test.") for row in records),
         "freshness_sources_passed": 2,
-        "freshness_tests_passed": 1 if customers else 2,
+        "freshness_tests_passed": 1 if customers or parallel else 2,
     }

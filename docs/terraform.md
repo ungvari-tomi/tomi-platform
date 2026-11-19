@@ -1,5 +1,8 @@
 # Local Terraform migration
 
+[Parallel ingestion](parallel-ingestion.md) adds opt-in Kafka, workers and isolated
+networks. It is prepared separately from existing batch services and is not applied.
+
 The [customer integration](customer-pipeline.md) prepares a scheduler-only read-only
 key-file mount, disabled by default. Key material does not enter Terraform state.
 Deployment and schedule activation are pending review.

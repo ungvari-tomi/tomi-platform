@@ -1,0 +1,36 @@
+version: 2
+sources:
+  - name: inventory_stream
+    schema: streaming
+    config:
+      enabled: "{{ var('parallel_ingestion', false) }}"
+    tables:
+      - name: inventory_movements
+        config:
+          loaded_at_field: occurred_at
+          freshness:
+            error_after: {count: 30, period: minute}
+            filter: >-
+              seed = {{ env_var('RETAILFLOW_SEED', '42') | int }}
+              AND interval_seconds = {{ env_var('RETAILFLOW_EVENT_INTERVAL_SECONDS', '600') | int }}
+  - name: shipment_events
+    schema: event_driven
+    config:
+      enabled: "{{ var('parallel_ingestion', false) }}"
+    tables:
+      - name: shipment_updates
+  - name: parallel_ops
+    schema: parallel_ops
+    config:
+      enabled: "{{ var('parallel_ingestion', false) }}"
+    tables:
+      - name: events
+      - name: batches
+        config:
+          loaded_at_field: loaded_at
+          freshness:
+            error_after: {count: 30, period: minute}
+            filter: >-
+              dataset_version = 'inventory-v1'
+              AND seed = {{ env_var('RETAILFLOW_SEED', '42') | int }}
+              AND interval_seconds = {{ env_var('RETAILFLOW_EVENT_INTERVAL_SECONDS', '600') | int }}

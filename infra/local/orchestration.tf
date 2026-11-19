@@ -93,6 +93,7 @@ locals {
     "RETAILFLOW_DATASET_VERSION=${var.orders_dataset_version}",
     "RETAILFLOW_SEED=${var.orders_seed}",
     "RETAILFLOW_INTERVAL_SECONDS=${var.orders_interval_seconds}",
+    "RETAILFLOW_EVENT_INTERVAL_SECONDS=${var.event_interval_seconds}",
     "RETAILFLOW_CUSTOMER_PRIVACY_KEY_ID=${var.customer_privacy_key_id}",
   ]
 }

@@ -136,6 +136,35 @@ def customers():
     dbt_build(load(extract()))
 
 
+@dag(
+    dag_id="retailflow_parallel_analytics",
+    schedule="*/10 * * * *",
+    start_date=datetime(2026, 11, 19, tzinfo=UTC),
+    catchup=False,
+    max_active_runs=1,
+    is_paused_upon_creation=True,
+    on_failure_callback=dag_failure,
+    default_args={
+        "retries": 2,
+        "retry_delay": timedelta(seconds=30),
+        "execution_timeout": timedelta(minutes=20),
+    },
+    tags=["retailflow", "streaming", "webhook", "analytics"],
+)
+def parallel_analytics():
+    @task
+    def dbt_build():
+        from retailflow.transformation import scheduled_build
+
+        context = get_current_context()
+        return scheduled_build(
+            context["dag"].dag_id, context["run_id"], context["ti"].try_number, parallel=True
+        )
+
+    dbt_build()
+
+
 orders()
 exchange_rates()
 customers()
+parallel_analytics()

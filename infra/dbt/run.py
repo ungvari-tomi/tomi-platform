@@ -32,6 +32,11 @@ def execute(action: str, database: Path, artifact_root: Path, *, lock_timeout: f
             ["test", "--select", "tag:customer_freshness"],
             ["build", "--select", "tag:customers"],
         ],
+        "parallel-pipeline": [
+            ["source", "freshness", "--select", "source:inventory_stream source:parallel_ops"],
+            ["test", "--select", "tag:parallel_freshness"],
+            ["build", "--select", "tag:parallel"],
+        ],
     }
     if action not in commands:
         raise ValueError("Unsupported dbt action")
@@ -54,12 +59,17 @@ def execute(action: str, database: Path, artifact_root: Path, *, lock_timeout: f
             raise FileNotFoundError("Refusing to create an empty warehouse for dbt")
         for index, arguments in enumerate(commands[action]):
             command_env = dict(env)
-            if action in {"freshness", "pipeline", "customer-pipeline"} and index < 2:
+            if (
+                action in {"freshness", "pipeline", "customer-pipeline", "parallel-pipeline"}
+                and index < 2
+            ):
                 phase = "source_freshness" if index == 0 else "freshness_tests"
                 command_env["DBT_TARGET_PATH"] = str(invocation / phase / "target")
                 command_env["DBT_LOG_PATH"] = str(invocation / phase / "logs")
             if action == "customer-pipeline":
                 arguments = [*arguments, "--vars", '{"customer_pipeline": true}']
+            if action == "parallel-pipeline":
+                arguments = [*arguments, "--vars", '{"parallel_ingestion": true}']
             # Fixed CLI executable and validated action.
             result = subprocess.run(  # nosec B603
                 [
@@ -84,7 +94,15 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "action",
-        choices=["check", "parse", "build", "freshness", "pipeline", "customer-pipeline"],
+        choices=[
+            "check",
+            "parse",
+            "build",
+            "freshness",
+            "pipeline",
+            "customer-pipeline",
+            "parallel-pipeline",
+        ],
         default="check",
         nargs="?",
     )

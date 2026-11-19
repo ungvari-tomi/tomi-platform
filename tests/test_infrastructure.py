@@ -65,6 +65,9 @@ def test_container_replacement_is_reported_separately_from_data_deletion() -> No
         ("docker_volume.airflow_postgres", ["delete", "create"]),
         ("docker_volume.airflow_state", ["delete"]),
         ("docker_volume.airflow_logs", ["delete"]),
+        ("docker_volume.kafka[0]", ["delete", "create"]),
+        ('docker_volume.event_state["inventory-producer"]', ["delete"]),
+        ("docker_network.inventory_stream[0]", ["delete"]),
     ],
 )
 def test_unsafe_plans_are_rejected(address: str, actions: list[str]) -> None:

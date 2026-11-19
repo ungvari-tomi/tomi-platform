@@ -38,6 +38,34 @@ Solid arrows show the implemented data path. Dashed arrows show planned reportin
 work. DuckDB holds both the raw tables and the transformed views. Airflow runs
 the extraction, loading and dbt steps as one workflow for each source.
 
+## Three parallel ingestion paths
+
+The streaming/event extension is prepared locally and is **not deployed**. It
+keeps the existing batch pipelines and adds two independently generated datasets:
+
+| Path | Data | Ingestion |
+| --- | --- | --- |
+| Batch — existing | Orders/customers and Frankfurter exchange rates | Scheduled API calls through Airflow |
+| Streaming — prepared | Synthetic inventory movements | Kafka producer and continuous consumer |
+| Event-driven — prepared | Synthetic shipment status changes | Authenticated webhook on each transition |
+
+```mermaid
+flowchart LR
+    OrdersFX["Orders + real FX APIs"] --> Batch["Existing scheduled batch"]
+    Stock["Generated inventory movements"] --> Kafka["Kafka stream"]
+    Kafka --> Consumer["Continuous consumer"]
+    Shipments["Generated shipment transitions"] --> Webhook["Signed webhook"]
+    Batch --> Blob["Azurite: independent namespaces"]
+    Consumer --> Blob
+    Webhook --> Blob
+    Blob --> Warehouse["DuckDB: separate tables, shared writer lock"]
+    Warehouse --> Dbt["dbt: separate models and quality checks"]
+```
+
+The new paths do not republish orders or add them to revenue totals. Inventory
+references existing product IDs; shipments reference generated order IDs without
+customer names or addresses. [Parallel ingestion design, tests and deployment](docs/parallel-ingestion.md).
+
 ## What each part does
 
 | Part | Its job |

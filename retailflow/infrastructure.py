@@ -147,6 +147,19 @@ def plan_summary(plan: dict) -> dict:
         "docker_volume.mailpit",
         "docker_image.mailpit",
         "docker_container.mailpit",
+        "docker_network.inventory_stream[0]",
+        "docker_network.shipment_events[0]",
+        "docker_volume.kafka[0]",
+        "docker_image.kafka[0]",
+        "docker_image.parallel[0]",
+        "docker_container.kafka[0]",
+        "docker_container.inventory_topic[0]",
+        'docker_volume.event_state["inventory-producer"]',
+        'docker_volume.event_state["shipment-simulator"]',
+        'docker_container.parallel["inventory-producer"]',
+        'docker_container.parallel["inventory-consumer"]',
+        'docker_container.parallel["shipment-simulator"]',
+        'docker_container.parallel["shipment-webhook"]',
     }
     for resource in plan.get("resource_changes", []):
         address, change = resource["address"], resource["change"]
@@ -250,6 +263,21 @@ def main() -> None:
     if customer_enabled == "true" and not (ROOT / ".local-secrets/customer.json").is_file():
         parser.error("Prepare the local scheduler key file before enabling customer ingestion")
     env["TF_VAR_customer_pipeline_enabled"] = customer_enabled
+    parallel_enabled = env.get(
+        "RETAILFLOW_PARALLEL_INGESTION_ENABLED",
+        local.get("RETAILFLOW_PARALLEL_INGESTION_ENABLED", "false"),
+    )
+    if parallel_enabled not in {"true", "false"}:
+        parser.error("Parallel ingestion enablement must be true or false")
+    if parallel_enabled == "true":
+        if not (ROOT / ".local-secrets/shipment-webhook.key").is_file():
+            parser.error("Prepare the local shipment webhook key before deployment review")
+        if env["TF_VAR_orders_dataset_version"] != "orders-v3":
+            parser.error("Shipment references require the current orders-v3 batch profile")
+    env["TF_VAR_parallel_ingestion_enabled"] = parallel_enabled
+    env["TF_VAR_event_interval_seconds"] = env.get(
+        "RETAILFLOW_EVENT_INTERVAL_SECONDS", local.get("RETAILFLOW_EVENT_INTERVAL_SECONDS", "600")
+    )
     env["TF_VAR_customer_privacy_key_id"] = env.get(
         "RETAILFLOW_CUSTOMER_PRIVACY_KEY_ID",
         local.get("RETAILFLOW_CUSTOMER_PRIVACY_KEY_ID") or "local-v1",

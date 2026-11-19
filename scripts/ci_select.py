@@ -70,6 +70,7 @@ def select(paths: list[str], *, full: bool = False) -> dict:
                     "RETAILFLOW_TEST_DUCKDB_IMAGE",
                     "RETAILFLOW_TEST_AZURITE",
                     "RETAILFLOW_TEST_MAILPIT_IMAGE",
+                    "RETAILFLOW_TEST_PARALLEL_IMAGES",
                 )
             ):
                 flags["integration"] = True
