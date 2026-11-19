@@ -1,0 +1,8 @@
+[project]
+name = "retailflow-catalog-extraction"
+version = "0.1.0"
+requires-python = ">=3.12,<3.13"
+dependencies = ["pymongo==4.20.1", "azure-storage-blob", "python-dotenv", "filelock"]
+
+[tool.uv]
+package = false

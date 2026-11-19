@@ -1,4 +1,4 @@
-# MongoDB product catalog: design and first milestone
+# MongoDB product catalog: design and milestones
 
 Status: foundation deployed locally on 2026-11-19 from CI-verified commit
 `f6ae472`, through an owner-approved catalog-only saved plan. The deployment added
@@ -88,8 +88,8 @@ reasonable optimizer choice. Hints demonstrate access paths, not benchmark wins.
 ```mermaid
 flowchart LR
     Seed["Python deterministic seed / manual CRUD"] --> Mongo["MongoDB products · first milestone"]
-    Mongo -.-> Extract["Python extraction · planned"]
-    Extract -.-> Blob["Azurite immutable Extended JSON + manifest"]
+    Mongo --> Extract["Python extraction · deployed one-shot"]
+    Extract --> Blob["Azurite immutable Extended JSON + manifest"]
     Blob -.-> Warehouse["DuckDB version history + atomic batch ledger"]
     Warehouse -.-> Models["dbt products + tested enrichment"]
     Models -.-> Analytics["Orders / inventory / dashboard"]
@@ -102,7 +102,13 @@ flowchart LR
 | 3 — warehouse/dbt | Append product document versions, atomic memberships/ledger, product models and enriched analytics | Reuse warehouse lock; reject conflicting `(product_id, revision)` payloads; preserve schema version, source manifest and hashes; left joins retain unmatched facts; no multiplication of order count/revenue; freshness belongs to dbt |
 | 4 — optional CDC | Separately reviewed replica-set topology and change-stream extraction | Persist/resume tokens only after verified landing; replay idempotently; handle expired tokens/history gaps, deletes and reconciliation; test crashes and backpressure |
 
-Start stage 2 with bounded full snapshots of this 20-document catalog and
+Stage 2 is implemented, tested in disposable storage and deployed locally through
+an owner-approved additive Terraform plan. It remains opt-in for new installations. See the
+[extraction runbook](mongodb-extraction.md) for recovery semantics, controls,
+verification commands and the saved-plan workflow. Its first 20-product batch
+and replay were verified in deployed Azurite; warehouse enrichment remains planned.
+
+Stage 2 uses bounded full snapshots of this 20-document catalog and
 revision/hash reconciliation. Incremental extraction can then add `(updated_at,
 _id)` keyset pagination with overlap, frozen boundaries and periodic full
 reconciliation. A timestamp-only cursor misses equal-millisecond, late/backdated
@@ -314,8 +320,9 @@ under ignored `artifacts/mongodb-deployment/`; Terraform reported no changes.
 ```powershell
 docker build -f infra/mongodb/server.Dockerfile -t retailflow-mongodb:validation infra/mongodb
 docker build -f infra/mongodb/client.Dockerfile -t retailflow-catalog:validation infra/mongodb
+docker build -f infra/mongodb/extraction/Dockerfile -t retailflow-catalog-extraction:validation .
 $env:RETAILFLOW_TEST_MONGODB_IMAGE = '1'
-.venv\Scripts\python.exe -m pytest -q -p no:cacheprovider tests/test_mongodb_catalog.py tests/test_mongodb_container.py
+.venv\Scripts\python.exe -m pytest -q -p no:cacheprovider tests/test_mongodb_catalog.py tests/test_mongodb_extraction.py tests/test_mongodb_container.py
 ```
 
 Atlas M0 is documentation-only: no Atlas provider, account, cluster or paid

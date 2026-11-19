@@ -33,7 +33,13 @@ def select(paths: list[str], *, full: bool = False) -> dict:
             flags["dependencies"] |= path.endswith(
                 ("uv.lock", "pyproject.toml", "requirements.txt")
             )
-            targets.update({"tests/test_mongodb_catalog.py", "tests/test_mongodb_container.py"})
+            targets.update(
+                {
+                    "tests/test_mongodb_catalog.py",
+                    "tests/test_mongodb_container.py",
+                    "tests/test_mongodb_extraction.py",
+                }
+            )
         elif path == "retailflow/infrastructure.py":
             flags["checks"] = flags["terraform"] = True
             targets.update({"tests/test_infrastructure.py", "tests/test_release_review.py"})

@@ -22,6 +22,7 @@ dev = [
     "detect-secrets",
     "pip-audit",
     "pytest",
+    "pymongo==4.20.1",
     "ruff",
     "sqlfluff>=4.5.0",
 ]

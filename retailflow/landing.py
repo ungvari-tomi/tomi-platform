@@ -5,65 +5,19 @@ import csv
 import hashlib
 import io
 import json
-import re
 from datetime import UTC, date, datetime
 from pathlib import Path
-from typing import Protocol
 from uuid import uuid4
 
 import httpx
 
 from retailflow.api import Order, OrderPage
+from retailflow.batch_landing import Store as Store
+from retailflow.batch_landing import download_batch as download_batch
+from retailflow.batch_landing import land as land
 from retailflow.blob_storage import BlobStore
 from retailflow.currencies import FX_QUOTES, SUPPORTED_DATASETS
 from retailflow.exchange_rates import fetch_eur_rate_response
-
-
-class Store(Protocol):
-    def put(self, name: str, payload: bytes, content_type: str) -> None: ...
-
-    def read(self, name: str) -> bytes: ...
-
-
-def land(
-    store: Store,
-    *,
-    source: str,
-    payload: bytes,
-    extension: str,
-    request: dict,
-    source_metadata: dict,
-    retrieved_at: datetime,
-    batch_id: str,
-) -> str:
-    if not re.fullmatch(r"[a-zA-Z0-9_-]{1,64}", batch_id):
-        raise ValueError("Batch ID must contain 1–64 letters, digits, underscores or hyphens")
-    prefix = f"{source}/ingestion_date={retrieved_at.date().isoformat()}/batch={batch_id}"
-    name = f"{prefix}/data.{extension}"
-    digest = hashlib.sha256(payload).hexdigest()
-    metadata = {
-        "manifest_version": 1,
-        "source": source,
-        "batch_id": batch_id,
-        "retrieved_at": retrieved_at.isoformat(),
-        "request": request,
-        "payload_blob": name,
-        "format": extension,
-        "encoding": "utf-8",
-        "bytes": len(payload),
-        "sha256": digest,
-        "source_metadata": source_metadata,
-    }
-    content_type = "text/csv; charset=utf-8" if extension == "csv" else "application/json"
-    store.put(name, payload, content_type)
-    if hashlib.sha256(store.read(name)).hexdigest() != digest:
-        raise ValueError("Uploaded data failed checksum verification; batch not committed")
-    manifest = f"{prefix}/metadata.json"
-    encoded = json.dumps(metadata, sort_keys=True, indent=2).encode("utf-8")
-    store.put(manifest, encoded, "application/json")
-    if store.read(manifest) != encoded:
-        raise ValueError("Metadata round-trip failed")
-    return manifest
 
 
 def land_orders(
@@ -98,17 +52,6 @@ def land_orders(
         retrieved_at=retrieved_at,
         batch_id=batch_id,
     )
-
-
-def download_batch(store: Store, manifest: str) -> tuple[dict, bytes]:
-    metadata = json.loads(store.read(manifest))
-    payload = store.read(metadata["payload_blob"])
-    if (
-        len(payload) != metadata["bytes"]
-        or hashlib.sha256(payload).hexdigest() != metadata["sha256"]
-    ):
-        raise ValueError("Downloaded batch checksum mismatch")
-    return metadata, payload
 
 
 def main() -> None:

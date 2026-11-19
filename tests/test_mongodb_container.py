@@ -1,7 +1,9 @@
 """Real Community MongoDB security, validation and recovery in disposable storage."""
 
+import base64
 import json
 import os
+import secrets as random_secrets
 import subprocess
 import time
 from uuid import uuid4
@@ -14,6 +16,43 @@ pytestmark = pytest.mark.skipif(
     os.environ.get("RETAILFLOW_TEST_MONGODB_IMAGE") != "1",
     reason="Opt in to isolated MongoDB Community/catalog images",
 )
+
+
+def test_extractor_state_volume_is_owned_by_nonroot_application():
+    script = """
+import os,stat
+from pathlib import Path
+state=Path('/state')
+assert os.getuid()==10001 and state.stat().st_uid==10001
+assert stat.S_IMODE(state.stat().st_mode)==0o700
+(state/'probe').write_text('synthetic-only')
+assert not Path('/run/secrets').exists()
+"""
+    result = subprocess.run(
+        [
+            "docker",
+            "run",
+            "--rm",
+            "--network",
+            "none",
+            "--read-only",
+            "--cap-drop",
+            "ALL",
+            "--security-opt",
+            "no-new-privileges:true",
+            "--mount",
+            "type=volume,target=/state",
+            "--entrypoint",
+            "python",
+            "retailflow-catalog-extraction:validation",
+            "-c",
+            script,
+        ],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
 
 
 def test_real_catalog_security_model_restart_and_backup_restore(tmp_path):
@@ -39,7 +78,7 @@ def test_real_catalog_security_model_restart_and_backup_restore(tmp_path):
             assert result.returncode == 0, result.stdout + result.stderr
         return result
 
-    def client(role, script):
+    def client(role, script, *, extraction=False, key=""):
         return docker(
             "run",
             "--rm",
@@ -52,11 +91,19 @@ def test_real_catalog_security_model_restart_and_backup_restore(tmp_path):
             "ALL",
             "--security-opt",
             "no-new-privileges:true",
+            "--tmpfs",
+            "/tmp:rw,noexec,nosuid,size=16m,uid=10001,gid=10001",
+            "-e",
+            "AZURITE_ACCOUNT_KEY=" + key,
+            "-e",
+            "RETAILFLOW_BLOB_ENDPOINT=http://tomi-platform-azurite-1:10000/retailflow",
             "--mount",
             f"type=volume,source={secret_volumes[role]},target=/run/secrets,readonly",
             "--entrypoint",
             "python",
-            "retailflow-catalog:validation",
+            "retailflow-catalog-extraction:validation"
+            if extraction
+            else "retailflow-catalog:validation",
             "-c",
             script,
         )
@@ -230,6 +277,68 @@ with connect('writer',Path('/run/secrets/catalog.json')) as c:
 print('PASS writer, deterministic seed, validation, CAS, soft delete and nested queries')
 """
         assert "PASS writer" in client("writer", writer_script).stdout
+        # This emulator has only disposable anonymous storage and no published ports.
+        emulator_key = base64.b64encode(random_secrets.token_bytes(32)).decode("ascii")
+        docker(
+            "run",
+            "-d",
+            "--name",
+            prefix + "-azurite",
+            "--network",
+            prefix,
+            "--network-alias",
+            "tomi-platform-azurite-1",
+            "--mount",
+            "type=volume,target=/data",
+            "-e",
+            "AZURITE_ACCOUNTS=retailflow:" + emulator_key,
+            "mcr.microsoft.com/azure-storage/azurite:3.37.0",
+            "azurite-blob",
+            "--blobHost",
+            "0.0.0.0",
+            "--location",
+            "/data",
+            "--silent",
+        )
+        extraction_script = """
+import time,os
+from pathlib import Path
+from bson.json_util import loads
+from infra.mongodb.catalog import connect
+from infra.mongodb.extract import extract
+from retailflow.blob_storage import BlobStore
+from retailflow.batch_landing import download_batch
+assert os.getuid()==10001
+assert not Path('/run/secrets/writer.json').exists()
+assert not Path('/run/secrets/admin.json').exists()
+store=BlobStore()
+try:
+ for attempt in range(30):
+  try:
+   store.ensure_container()
+   break
+  except Exception:
+   if attempt==29: raise
+   time.sleep(1)
+ with connect('reader',Path('/run/secrets/catalog.json')) as c:
+  result=extract(store,c.retailflow.products,Path('/tmp/extraction'),'first')
+  metadata,body=download_batch(store,result['manifest'])
+  rows=loads(body)
+  assert len(rows)==20 and rows[0]['revision']==2 and rows[0]['status']=='retired'
+  assert extract(store,c.retailflow.products,Path('/tmp/extraction'),'first')['status']=='replayed'
+  assert len(list(store.container.list_blobs()))==2
+  try:
+   store.put(metadata['payload_blob'],b'changed','application/json')
+  except ValueError: pass
+  else: raise AssertionError('Immutable blob was replaced')
+ print('PASS MongoDB reader to real Azurite, BSON, replay and immutable conflict')
+finally:
+ store.close()
+"""
+        assert (
+            "PASS MongoDB reader to real Azurite"
+            in client("reader", extraction_script, extraction=True, key=emulator_key).stdout
+        )
         reader_script = """
 from pathlib import Path
 from pymongo import MongoClient
@@ -351,7 +460,7 @@ print('PASS new-target restore preserves documents, validation and indexes')
         assert not log_leaked, "Credential leaked into MongoDB logs"
     finally:
         cleanup_errors = []
-        for name in [worker, server, *secret_owners]:
+        for name in [worker, server, prefix + "-azurite", *secret_owners]:
             result = docker("rm", "--force", "--volumes", name, check=False)
             if result.returncode and "No such container" not in result.stderr:
                 cleanup_errors.append(name)

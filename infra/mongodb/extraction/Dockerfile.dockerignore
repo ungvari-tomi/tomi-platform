@@ -1,0 +1,13 @@
+*
+!infra/
+!infra/mongodb/
+!infra/mongodb/catalog.py
+!infra/mongodb/extract.py
+!infra/mongodb/extraction/
+!infra/mongodb/extraction/Dockerfile
+!infra/mongodb/extraction/Dockerfile.dockerignore
+!infra/mongodb/extraction/requirements.txt
+!retailflow/
+!retailflow/__init__.py
+!retailflow/batch_landing.py
+!retailflow/blob_storage.py
