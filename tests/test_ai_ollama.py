@@ -152,6 +152,10 @@ with httpx.Client(trust_env=False,timeout=5) as client:
       '0f45bae8cd2fec097cf09b400b078cf42388a1f5702f4058d2d6d641a09db46d', # pragma: allowlist secret
     }
     assert models[0]['digest'] in expected
+    # Reproduce the first question after idle expiry, rather than a warm-only test.
+    c=client.post(endpoint+'/api/generate',json={'model':'qwen3:1.7b','keep_alive':0})
+    c.raise_for_status()
+    assert not client.get(endpoint+'/api/ps').json()['models']
 context=AnalysisContext(source='catalog',dataset_id='profile-a',start_date=date(2026,11,19),end_date=date(2026,11,19),inventory_seed=42,inventory_interval_seconds=600)
 class Recording(JsonProvider):
     def decide(self,*args):
@@ -159,7 +163,7 @@ class Recording(JsonProvider):
         self.last=result.model_dump()
         return result
 provider=Recording('ollama','qwen3:1.7b',endpoint=endpoint+'/api/chat')
-agent=Agent(provider,total_seconds=180,decision_seconds=60)
+agent=Agent(provider,total_seconds=180,decision_seconds=120)
 cases=[
  ('markets','Rank the markets by their euro takings.','country_performance'),
  ('items','Which items were ordered most frequently?','product_performance'),

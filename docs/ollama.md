@@ -62,7 +62,7 @@ it. Select catalog for category analysis. Try “Rank the markets by their euro
 takings”, “Which items were ordered most frequently?” and a follow-up such as
 “Just Hungary please.” Inspect the trace, coverage and snapshot evidence.
 
-CPU generation can be slow. The local provider has up to 60 seconds per decision,
+CPU generation can be slow. The local provider has up to 120 seconds per decision,
 180 seconds per turn, six tool calls, an 8,192-token context and a 256-token
 decision output cap. Thinking output is disabled. Schemas are deduplicated in a
 stable concise system prompt to reduce repeated prefill; the full authoritative
@@ -99,6 +99,20 @@ and network. Its measured report goes to ignored
 `artifacts/ai-evaluation/ollama-local.json`. No real-model reliability percentage
 is implied by mock or protocol tests. Deployment and real-model results are recorded
 only after those operations actually complete.
+
+The regression evaluation explicitly unloads the model before its first question.
+A user cold start exposed that loading alone could consume about 35 seconds of
+the original 60-second decision budget. The corrected budget includes loading and
+generation, while retaining the 180-second total turn limit. Timeouts now explain
+the failure instead of conflating it with malformed model output. Increasing this
+bound does not guarantee that every question completes on a busy CPU.
+
+The corrected candidate answered the user's exact market-ranking question after
+an explicit unload in 132.0 seconds, using verified read-only live snapshots.
+It selected country performance four times before answering: bounded repeated
+tool selection remains a small-model limitation, even when the timeout is fixed.
+Twenty focused agent/service regression tests passed; Ruff, Bandit and the source
+safety gate also passed. This candidate result alone is not deployment evidence.
 
 Model weights are reproducible public artifacts, separate from business-data
 backups. Keep their pinned digest and seed receipt; do not auto-delete the protected

@@ -64,7 +64,7 @@ answering. The mock is a deterministic test double, not an LLM. Financial prose
 is rendered from deterministic results: the model selects evidence and its order,
 but cannot insert invented totals. This intentionally limits narrative flexibility.
 Each turn allows six tools and ten seconds per tool. Mock allows 45 seconds overall;
-local Ollama allows 180 seconds overall and 60 seconds per model decision. Thread
+local Ollama allows 180 seconds overall and 120 seconds per model decision. Thread
 timeouts bound the response; running read-only work finishes cooperatively.
 
 Ollama uses its [JSON chat API](https://docs.ollama.com/api/chat). Initial protocol
@@ -205,7 +205,7 @@ installation is needed. Follow the [local model guide](ollama.md) for settings,
 resource limits, protected storage and actual evaluation/deployment results.
 
 Local generation consumes CPU/RAM/disk and electricity. The reviewed CPU budget
-is 60 seconds per decision and 180 seconds per turn; observed answers took about
+is 120 seconds per decision and 180 seconds per turn; observed answers took about
 20-100 seconds. Timeouts fail visibly with no paid or mock fallback. Mock remains
 a limited-vocabulary offline test double. Actual local model tool selection is
 dynamic, with the same read-only capability boundary.

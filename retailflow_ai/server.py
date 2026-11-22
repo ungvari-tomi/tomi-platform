@@ -115,7 +115,7 @@ def main():
     if bind not in {"127.0.0.1", "0.0.0.0"}:  # nosec B104
         raise ValueError("Invalid analyst bind address")
     agent = (
-        Agent(provider, total_seconds=180, decision_seconds=60)
+        Agent(provider, total_seconds=180, decision_seconds=120)
         if kind == "ollama"
         else Agent(provider)
     )

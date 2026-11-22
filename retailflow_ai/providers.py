@@ -6,7 +6,7 @@ import time
 
 import httpx
 
-from retailflow_ai.agent import Decision, ProviderUnavailable
+from retailflow_ai.agent import Decision, ProviderTimeout, ProviderUnavailable
 
 COUNTRY_NAMES = {
     "HU": ("Hungary",),
@@ -333,7 +333,7 @@ class JsonProvider:
             with httpx.Client(
                 trust_env=False,
                 follow_redirects=False,
-                timeout=min(timeout, 60),
+                timeout=min(timeout, 120),
                 transport=self.transport,
             ) as client:
                 with client.stream("POST", self.endpoint, json=body) as response:
@@ -341,10 +341,14 @@ class JsonProvider:
                     data = bytearray()
                     for chunk in response.iter_bytes():
                         data.extend(chunk)
-                        if len(data) > 64_000 or time.monotonic() - started > timeout:
+                        if time.monotonic() - started > timeout:
+                            raise ProviderTimeout()
+                        if len(data) > 64_000:
                             raise ProviderUnavailable()
             result = json.loads(data)
             text = result["message"]["content"]
             return Decision.model_validate_json(text)
+        except (httpx.TimeoutException, ProviderTimeout):
+            raise ProviderTimeout("provider_timeout") from None
         except Exception:
             raise ProviderUnavailable("provider_unavailable_or_invalid") from None

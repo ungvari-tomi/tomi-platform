@@ -64,6 +64,10 @@ class ProviderUnavailable(RuntimeError):
     pass
 
 
+class ProviderTimeout(ProviderUnavailable):
+    pass
+
+
 MESSAGES = {
     "question": (
         "Please clarify the business question using sales, FX coverage or inventory movements."
@@ -166,7 +170,7 @@ class Agent:
             not 1 <= max_calls <= 6
             or not 0 < total_seconds <= 180
             or not 0 < tool_seconds <= 15
-            or not 0 < decision_seconds <= 60
+            or not 0 < decision_seconds <= 120
         ):
             raise ValueError("Invalid analyst budgets")
         self.provider = provider
@@ -229,6 +233,12 @@ class Agent:
                     decision = provider_future.result(timeout=min(remaining, self.decision_seconds))
                     if not isinstance(decision, Decision):
                         raise ProviderUnavailable()
+                except (TimeoutError, ProviderTimeout):
+                    return answer(
+                        "unavailable",
+                        "The local model timed out while loading or processing the question. "
+                        "Please retry after it finishes; no answer was generated.",
+                    )
                 except Exception:
                     return answer(
                         "unavailable",

@@ -10,7 +10,7 @@ from test_ai_tools import tools as tools
 from test_catalog_reporting import warehouse as warehouse
 from test_reporting import sales_warehouse as sales_warehouse
 
-from retailflow_ai.agent import Agent, AnalysisContext, Decision, Question
+from retailflow_ai.agent import Agent, AnalysisContext, Decision, ProviderTimeout, Question
 from retailflow_ai.providers import JsonProvider, MockProvider
 
 
@@ -34,6 +34,35 @@ class Scripted:
 
     def decide(self, state, schemas, timeout):
         return next(self.decisions)
+
+
+def test_cold_model_budget_reaches_http_without_old_sixty_second_cap(tools):
+    seen = []
+
+    def handler(request):
+        seen.append(request.extensions["timeout"]["read"])
+        raise httpx.ReadTimeout("private transport detail")
+
+    provider = JsonProvider("ollama", "test", transport=httpx.MockTransport(handler))
+    result = Agent(provider, total_seconds=180, decision_seconds=120).run(question(), tools.reports)
+    assert seen == [120]
+    assert result.status == "unavailable" and "timed out" in result.text
+    assert "private transport detail" not in result.text
+    assert not result.evidence and not result.trace
+    assert Agent(MockProvider()).decision_seconds == 15
+    with pytest.raises(ValueError, match="budgets"):
+        Agent(provider, decision_seconds=121)
+
+
+def test_provider_timeout_is_distinct_from_invalid_response():
+    provider = JsonProvider(
+        "ollama", "test", transport=httpx.MockTransport(lambda _: httpx.Response(200, json={}))
+    )
+    from retailflow_ai.agent import ProviderUnavailable
+
+    with pytest.raises(ProviderUnavailable) as error:
+        provider.decide({"question": "Rank markets", "results": {}, "history": []}, [], 120)
+    assert not isinstance(error.value, ProviderTimeout)
 
 
 def test_agent_dynamically_selects_tools_and_cites_actual_results(tools):
