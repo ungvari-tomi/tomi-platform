@@ -103,8 +103,6 @@ def main():
             kind,
             os.environ.get("RETAILFLOW_AI_MODEL", ""),
             endpoint=os.environ.get("RETAILFLOW_AI_OLLAMA_ENDPOINT"),
-            key_file=Path("/run/secrets/model-key") if kind == "openai" else None,
-            allow_hosted=os.environ.get("RETAILFLOW_AI_ALLOW_HOSTED") == "true",
         )
     bind = os.environ.get("RETAILFLOW_AI_BIND", "127.0.0.1")
     if bind not in {"127.0.0.1", "0.0.0.0"}:  # nosec B104

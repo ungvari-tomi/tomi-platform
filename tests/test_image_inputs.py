@@ -12,6 +12,35 @@ TERRAFORM = ROOT / ".bootstrap/terraform/terraform.exe"
 EXECUTABLE = str(TERRAFORM) if TERRAFORM.is_file() else shutil.which("terraform")
 
 
+@pytest.mark.skipif(not EXECUTABLE, reason="Terraform CLI is required")
+@pytest.mark.parametrize("provider,allowed", [("mock", True), ("ollama", True), ("openai", False)])
+def test_analyst_terraform_rejects_paid_providers(tmp_path, provider, allowed):
+    source = (ROOT / "infra/local/analyst.tf").read_text(encoding="utf-8")
+    variable = (
+        'variable "analyst_provider" {'
+        + source.split('variable "analyst_provider" {', 1)[1].split('variable "analyst_model"', 1)[
+            0
+        ]
+    )
+    (tmp_path / "main.tf").write_text(variable, encoding="utf-8")
+    result = subprocess.run(
+        [
+            EXECUTABLE,
+            f"-chdir={tmp_path}",
+            "plan",
+            "-input=false",
+            "-no-color",
+            f"-var=analyst_provider={provider}",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert (result.returncode == 0) == allowed, result.stdout + result.stderr
+    if not allowed:
+        assert "Free-only platform" in result.stderr
+
+
 @pytest.mark.skipif(not EXECUTABLE, reason="Terraform CLI is required for real hash evaluation")
 def test_reporting_module_rebuilds_both_publisher_and_dashboard(tmp_path):
     module = tmp_path / "infra/local"

@@ -20,8 +20,8 @@ A small explicit Pydantic tool-calling loop is preferable to a framework here:
 few capabilities, inspectable authorization, bounded calls and no new ingestion/
 Airflow/dbt dependencies. The agent has its own package/runtime. Streamlit will
 call an opt-in private service; disabled AI must not affect existing pages.
-Mock-provider tests will be mandatory/offline; a local Ollama adapter and optional
-hosted adapter are separate provider choices, without mandatory keys/subscriptions.
+Mock-provider tests are mandatory/offline; local Ollama is the only model adapter.
+The owner's free-only policy prohibits hosted/paid providers, including trials.
 
 ## Phase A: deterministic data boundary
 
@@ -60,10 +60,10 @@ but cannot insert invented totals. This intentionally limits narrative flexibili
 Each turn allows six tools, 45 seconds overall and ten seconds per tool. Thread
 timeouts bound the response; running read-only work finishes cooperatively.
 
-Ollama uses its [JSON chat API](https://docs.ollama.com/api/chat). Optional hosted
-analysis uses the [OpenAI Responses API](https://developers.openai.com/api/docs/quickstart)
-with explicit consent, a file-mounted key and `store=false`. Neither adapter has
+Ollama uses its [JSON chat API](https://docs.ollama.com/api/chat). It has not
 been exercised against a real model in this milestone; protocol tests use mock HTTP.
+An initial hosted adapter was removed when the owner required free-only operation.
+Runtime and Terraform both reject hosted providers; no model key mounts exist.
 Offline phase A/B validation: 24 focused tests passed. No service was deployed.
 
 ## Phase C — private service and chat
@@ -76,10 +76,10 @@ the AI page; existing sales/catalog pages keep working.
 Terraform adds an opt-in `analyst_enabled` component with an internal bridge, no
 published port, non-root UID/GID 10001, read-only root/reporting volume, dropped
 capabilities, 512 MiB memory and 0.5 CPU. Mock mode has no egress network. Ollama
-and explicitly opted-in hosted mode add a model-access bridge. Fixed adapter
+adds a model-access bridge. Fixed adapter
 endpoints, disabled proxies and redirects limit application requests; this bridge
 is not a destination-level firewall. A compromised process would have broader
-network access. Only hosted mode mounts its separate private model key file.
+network access. No model credentials are accepted or mounted.
 
 No authentication is claimed for the private service or existing loopback UI.
 Keep both local; external/multi-user access requires a separate design. The AI
@@ -109,7 +109,7 @@ flowchart LR
     Readers --> Tools[Deterministic allowlisted tools]
     Employee[Employee question + selected scope] --> UI[Streamlit chat]
     UI --> Agent[Private bounded decision loop]
-    Agent <--> Model[Mock / local Ollama / optional hosted model]
+    Agent <--> Model[Mock / local Ollama only]
     Agent <--> Tools
     Agent --> Answer[Evidence-bound answer + warnings + trace]
     Answer --> UI
@@ -176,8 +176,6 @@ RETAILFLOW_DASHBOARD_ENABLED=true
 RETAILFLOW_AI_ENABLED=true
 RETAILFLOW_AI_PROVIDER=mock
 RETAILFLOW_AI_MODEL=
-RETAILFLOW_AI_ALLOW_HOSTED=false
-RETAILFLOW_AI_KEY_FILE=
 ```
 
 `python -m retailflow.infrastructure` maps these to opt-in Terraform variables.
@@ -204,22 +202,19 @@ Local generation uses CPU/GPU/RAM/disk and electricity; a model may exceed the
 model separately. Never increase budgets silently or fall back to a paid provider.
 Protocol/schema support is tested with mock HTTP; real model generation has not
 been verified. Mock mode supports a limited English vocabulary; it is visibly a
-demo planner. Local/hosted model selection is dynamic, with the same capability boundary.
+demo planner. Local model selection is dynamic, with the same capability boundary.
 
-### Optional hosted model
+### Free-only policy
 
-Set provider `openai`, an explicitly chosen supported Responses model, and
-`RETAILFLOW_AI_ALLOW_HOSTED=true`. Put its key in an ignored `.local-secrets/` file
-with owner-only ACLs; set `RETAILFLOW_AI_KEY_FILE` to the absolute path. Verify
-non-root read access and owner/SYSTEM/Administrator ACLs before deployment. Never
-put the key itself in `.env`, `TF_VAR_*`, a command line or Terraform expressions.
-Terraform stores the mount path, not file contents. The key exists only in this
-optional service; the dashboard never receives it.
-
-Hosted analysis has usage costs and sends questions, bounded history, approved
-aggregates and snapshot metadata externally. Review provider retention, account
-policy, budget and approved data uses before opt-in. `store=false` is not a claim
-of zero provider retention. There is no automatic hosted fallback or spend guarantee.
+Only mock and local Ollama are supported. There are no hosted adapters, API-key
+settings, paid services, expiring trials or automatic cloud fallback. Terraform and
+runtime reject hosted providers; legacy opt-in environment flags cannot override
+this rule. Cloud-named Ollama models are rejected too. Before enabling Ollama,
+the operator must disable its cloud features with `OLLAMA_NO_CLOUD=1` on the
+Ollama server and verify an installed local model. See the
+[official Ollama cloud-disable instructions](https://github.com/ollama/ollama/blob/main/docs/faq.mdx).
+Model-name checks alone do not prove that a separately operated server cannot
+route a custom alias remotely. The initial mock deployment has no egress bridge.
 
 ## Evaluation and CI
 
@@ -268,7 +263,7 @@ Chat/session evidence is bounded to six messages and lost when the session ends;
 disk by application code or logged. No raw operational logs enter the service.
 Existing immutable reporting retention/owner-reviewed deletion stays unchanged;
 the agent never deletes snapshots. Evaluation artifacts contain synthetic metrics
-and can be manually removed by the owner. Hosted retention is governed separately.
+and can be manually removed by the owner. No hosted model receives conversations.
 Do not type real personal data or secrets into the assistant.
 
 ## Demonstration and troubleshooting
@@ -342,3 +337,6 @@ include a complete multi-step JSON-adapter/tool/evidence loop using mock HTTP.
 Feature CI still needs a remote run after an explicitly authorized push. No
 Terraform plan/apply, live schedule change or AI deployment was performed.
 
+The platform showcases capabilities at small local scale; no chargeable resources
+or subscription configuration may be enabled. Local RAM/disk usage still requires
+review before introducing a real model.

@@ -295,12 +295,10 @@ def main() -> None:
         ("enabled", "false"),
         ("provider", "mock"),
         ("model", ""),
-        ("allow_hosted", "false"),
-        ("key_file", ""),
     ):
         name = "RETAILFLOW_AI_" + setting.upper()
         value = env.get(name, local.get(name, default))
-        if setting in {"enabled", "allow_hosted"} and value not in {"true", "false"}:
+        if setting == "enabled" and value not in {"true", "false"}:
             parser.error("Analyst boolean settings must be true or false")
         env["TF_VAR_analyst_" + setting] = value
     catalog_enabled = env.get(

@@ -162,25 +162,22 @@ def test_local_provider_protocol_and_redirect_rejection(tools):
         provider.decide({}, [], 1)
 
 
-def test_hosted_is_double_opt_in_and_key_never_enters_model_payload(tmp_path):
-    key = tmp_path / "local-key"
-    key.write_text("test-only-provider-key")
-    with pytest.raises(ValueError):
-        JsonProvider("openai", "test", key_file=key)
+@pytest.mark.parametrize("kind", ["openai", "anthropic", "hosted"])
+def test_free_only_policy_blocks_hosted_even_with_legacy_opt_in(kind, monkeypatch):
+    from retailflow_ai.server import main
 
-    def handler(request):
-        assert request.url == "https://api.openai.com/v1/responses"
-        assert "test-only-provider-key" not in request.content.decode()
-        assert request.headers["authorization"] == "Bearer test-only-provider-key"
-        return httpx.Response(
-            200,
-            json={"output": [{"content": [{"type": "output_text", "text": '{"kind":"abstain"}'}]}]},
-        )
+    with pytest.raises(ValueError, match="Free-only"):
+        JsonProvider(kind, "test")
+    monkeypatch.setenv("RETAILFLOW_AI_PROVIDER", kind)
+    monkeypatch.setenv("RETAILFLOW_AI_MODEL", "test")
+    monkeypatch.setenv("RETAILFLOW_AI_ALLOW_HOSTED", "true")
+    with pytest.raises(ValueError, match="Free-only"):
+        main()
 
-    provider = JsonProvider(
-        "openai", "test", key_file=key, allow_hosted=True, transport=httpx.MockTransport(handler)
-    )
-    assert provider.decide({}, [], 1).kind == "abstain"
+
+def test_cloud_model_names_are_rejected():
+    with pytest.raises(ValueError, match="cloud models are prohibited"):
+        JsonProvider("ollama", "example:cloud")
 
 
 def test_json_model_adapter_runs_a_genuine_multistep_tool_loop(tools):

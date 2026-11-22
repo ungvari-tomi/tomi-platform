@@ -1,9 +1,8 @@
-"""Offline test model and bounded local/optional-hosted JSON decision adapters."""
+"""Free-only offline test model and bounded local Ollama JSON decisions."""
 
 import json
 import re
 import time
-from pathlib import Path
 
 import httpx
 
@@ -107,26 +106,21 @@ class JsonProvider:
         model: str,
         *,
         endpoint: str | None = None,
-        key_file: Path | None = None,
-        allow_hosted: bool = False,
         transport=None,
     ):
-        if kind not in {"ollama", "openai"} or not model or len(model) > 100:
-            raise ValueError("Invalid provider configuration")
-        if kind == "ollama":
-            endpoint = endpoint or "http://127.0.0.1:11434/api/chat"
-            if endpoint not in {
-                "http://127.0.0.1:11434/api/chat",
-                "http://localhost:11434/api/chat",
-                "http://host.docker.internal:11434/api/chat",
-            }:
-                raise ValueError("Only approved local Ollama endpoints are permitted")
-        elif not allow_hosted or key_file is None:
-            raise ValueError("Hosted analysis requires explicit opt-in and a private key file")
-        elif endpoint is not None:
-            raise ValueError("The hosted endpoint is fixed")
+        if kind != "ollama":
+            raise ValueError("Free-only platform: hosted providers are prohibited")
+        if not model or len(model) > 100 or "cloud" in model.lower():
+            raise ValueError("Choose an installed local model; cloud models are prohibited")
+        endpoint = endpoint or "http://127.0.0.1:11434/api/chat"
+        if endpoint not in {
+            "http://127.0.0.1:11434/api/chat",
+            "http://localhost:11434/api/chat",
+            "http://host.docker.internal:11434/api/chat",
+        }:
+            raise ValueError("Only approved local Ollama endpoints are permitted")
         self.name, self.model, self.endpoint = kind, model, endpoint
-        self.key_file, self.transport = key_file, transport
+        self.transport = transport
 
     def decide(self, state: dict, schemas: list[dict], timeout: float) -> Decision:
         started = time.monotonic()
@@ -136,32 +130,13 @@ class JsonProvider:
         if len(payload.encode()) > 128_000:
             raise ProviderUnavailable()
         messages = [{"role": "system", "content": SYSTEM}, {"role": "user", "content": payload}]
-        headers = {}
-        if self.name == "ollama":
-            url = self.endpoint
-            body = {
-                "model": self.model,
-                "messages": messages,
-                "format": Decision.model_json_schema(),
-                "stream": False,
-                "options": {"temperature": 0, "num_predict": 1500},
-            }
-        else:
-            url = "https://api.openai.com/v1/responses"
-            try:
-                key = self.key_file.read_text().strip()
-                if not key or len(key) > 512 or "\n" in key or "\r" in key:
-                    raise ValueError()
-            except Exception:
-                raise ProviderUnavailable("provider_unavailable_or_invalid") from None
-            headers = {"Authorization": "Bearer " + key}
-            body = {
-                "model": self.model,
-                "input": messages,
-                "store": False,
-                "max_output_tokens": 1500,
-                "text": {"format": {"type": "json_object"}},
-            }
+        body = {
+            "model": self.model,
+            "messages": messages,
+            "format": Decision.model_json_schema(),
+            "stream": False,
+            "options": {"temperature": 0, "num_predict": 1500},
+        }
         try:
             with httpx.Client(
                 trust_env=False,
@@ -169,7 +144,7 @@ class JsonProvider:
                 timeout=min(timeout, 15),
                 transport=self.transport,
             ) as client:
-                with client.stream("POST", url, json=body, headers=headers) as response:
+                with client.stream("POST", self.endpoint, json=body) as response:
                     response.raise_for_status()
                     data = bytearray()
                     for chunk in response.iter_bytes():
@@ -177,18 +152,7 @@ class JsonProvider:
                         if len(data) > 64_000 or time.monotonic() - started > timeout:
                             raise ProviderUnavailable()
             result = json.loads(data)
-            if self.name == "ollama":
-                text = result["message"]["content"]
-            else:
-                texts = [
-                    c["text"]
-                    for item in result["output"]
-                    for c in item.get("content", [])
-                    if c.get("type") == "output_text"
-                ]
-                if len(texts) != 1:
-                    raise ProviderUnavailable()
-                text = texts[0]
+            text = result["message"]["content"]
             return Decision.model_validate_json(text)
         except Exception:
             raise ProviderUnavailable("provider_unavailable_or_invalid") from None

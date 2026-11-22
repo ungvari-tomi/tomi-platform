@@ -176,8 +176,8 @@ Shipment reporting and replica-set change streams remain future milestones.
 **Prepared on `feature/agentic-ai`, not deployed:** an opt-in AI business analyst
 in Streamlit. It selects read-only tools over verified snapshots, calculates exact
 amounts deterministically and shows evidence, FX gaps and limitations. Offline mock
-mode needs no account; local Ollama and explicitly opted-in hosted adapters share
-the same restricted tools. See [setup, evaluation and security](docs/agentic-ai.md).
+mode needs no account; local Ollama uses the same restricted tools. Hosted/paid
+providers are prohibited by configuration and runtime. See [setup, evaluation and security](docs/agentic-ai.md).
 Read-only operational investigation is designed as a separate next milestone.
 Optional Azure/Snowflake targets remain future possibilities; the current platform
 is a local engineering project, not a production cloud deployment.

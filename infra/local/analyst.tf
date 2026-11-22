@@ -8,30 +8,14 @@ variable "analyst_provider" {
   type    = string
   default = "mock"
   validation {
-    condition     = contains(["mock", "ollama", "openai"], var.analyst_provider)
-    error_message = "Use mock, ollama or openai."
+    condition     = contains(["mock", "ollama"], var.analyst_provider)
+    error_message = "Free-only platform: use mock or local ollama; hosted providers are prohibited."
   }
 }
 
 variable "analyst_model" {
   type    = string
   default = ""
-}
-
-variable "analyst_allow_hosted" {
-  type    = bool
-  default = false
-}
-
-variable "analyst_key_file" {
-  type        = string
-  default     = ""
-  description = "Ignored private hosted-provider key path only; contents never enter Terraform."
-}
-
-locals {
-  analyst_key_path         = replace(abspath(var.analyst_key_file), "\\", "/")
-  analyst_key_mount_source = can(regex("^[A-Za-z]:/", local.analyst_key_path)) ? "/run/desktop/mnt/host/${lower(substr(local.analyst_key_path, 0, 1))}/${substr(local.analyst_key_path, 3, length(local.analyst_key_path) - 3)}" : local.analyst_key_path
 }
 
 resource "docker_network" "analyst" {
@@ -86,22 +70,12 @@ resource "docker_container" "analyst" {
   env = concat([
     "RETAILFLOW_AI_PROVIDER=${var.analyst_provider}",
     "RETAILFLOW_AI_MODEL=${var.analyst_model}",
-    "RETAILFLOW_AI_ALLOW_HOSTED=${var.analyst_allow_hosted}",
   ], var.analyst_provider == "ollama" ? ["RETAILFLOW_AI_OLLAMA_ENDPOINT=http://host.docker.internal:11434/api/chat"] : [])
   mounts {
     target    = "/reports"
     source    = docker_volume.reporting[0].name
     type      = "volume"
     read_only = true
-  }
-  dynamic "mounts" {
-    for_each = var.analyst_provider == "openai" ? [var.analyst_key_file] : []
-    content {
-      target    = "/run/secrets/model-key"
-      source    = local.analyst_key_mount_source
-      type      = "bind"
-      read_only = true
-    }
   }
   tmpfs = { "/tmp" = "rw,noexec,nosuid,size=64m,uid=10001,gid=10001" }
   healthcheck {
@@ -119,10 +93,6 @@ resource "docker_container" "analyst" {
     precondition {
       condition     = var.analyst_provider == "mock" || (length(var.analyst_model) > 0 && length(var.analyst_model) <= 100)
       error_message = "Choose an installed/supported model explicitly. Terraform never pulls a model."
-    }
-    precondition {
-      condition     = var.analyst_provider != "openai" || (var.analyst_allow_hosted && var.analyst_key_file != "")
-      error_message = "Hosted calls require cost/data-sharing consent and an existing private key file."
     }
   }
   depends_on = [docker_container.reporting_permissions]
