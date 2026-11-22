@@ -41,7 +41,7 @@ resource "docker_container" "ollama_seed" {
   remove_volumes = false
   memory         = 512
   memory_swap    = 512
-  cpus           = "1"
+  cpus           = "1.0"
   security_opts  = ["no-new-privileges:true"]
   capabilities { drop = ["ALL"] }
   mounts {
@@ -63,7 +63,7 @@ resource "docker_container" "ollama" {
   remove_volumes = false
   memory         = 3072
   memory_swap    = 3072
-  cpus           = "2"
+  cpus           = "2.0"
   security_opts  = ["no-new-privileges:true"]
   capabilities { drop = ["ALL"] }
   networks_advanced { name = docker_network.analyst_model[0].name }
