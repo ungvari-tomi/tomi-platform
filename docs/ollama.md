@@ -114,6 +114,17 @@ tool selection remains a small-model limitation, even when the timeout is fixed.
 Twenty focused agent/service regression tests passed; Ruff, Bandit and the source
 safety gate also passed. This candidate result alone is not deployment evidence.
 
+The fix was subsequently deployed on 2026-11-22 from `6143a5e`, following
+[successful CI](https://github.com/ungvari-tomi/tomi-platform/actions/runs/45058087363),
+a verified locked warehouse backup and checksum verification of 5,946 landed
+blobs. The reviewed saved plan replaced only the analyst image and container.
+Deployed Streamlit verification explicitly unloaded the model: the first answer
+completed in **130.9 seconds**, followed by a successful Hungary-only question.
+Evidence, existing report pages, immutable snapshots and the private/cloud-disabled
+boundaries passed verification. Both reporting DAGs were restored to their previous
+states, and a refreshed Terraform plan reported no changes. Private deployment
+evidence is retained under ignored `artifacts/ollama-timeout/`.
+
 Model weights are reproducible public artifacts, separate from business-data
 backups. Keep their pinned digest and seed receipt; do not auto-delete the protected
 volume. Existing blob/warehouse/report backup and retention rules are unchanged.
