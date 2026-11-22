@@ -158,6 +158,11 @@ def plan_summary(plan: dict) -> dict:
         "docker_network.analyst_model[0]",
         "docker_image.analyst[0]",
         "docker_container.analyst[0]",
+        "docker_volume.ollama_models[0]",
+        "docker_network.ollama_download[0]",
+        "docker_image.ollama[0]",
+        "docker_container.ollama[0]",
+        "docker_container.ollama_seed[0]",
         "docker_network.shipment_events[0]",
         "docker_volume.kafka[0]",
         "docker_image.kafka[0]",
@@ -291,6 +296,12 @@ def main() -> None:
     if dashboard_enabled not in {"true", "false"}:
         parser.error("Dashboard enablement must be true or false")
     env["TF_VAR_dashboard_enabled"] = dashboard_enabled
+    ollama_enabled = env.get(
+        "RETAILFLOW_OLLAMA_ENABLED", local.get("RETAILFLOW_OLLAMA_ENABLED", "false")
+    )
+    if ollama_enabled not in {"true", "false"}:
+        parser.error("Local Ollama enablement must be true or false")
+    env["TF_VAR_ollama_enabled"] = ollama_enabled
     for setting, default in (
         ("enabled", "false"),
         ("provider", "mock"),

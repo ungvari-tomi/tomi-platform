@@ -147,6 +147,7 @@ def test_local_provider_protocol_and_redirect_rejection(tools):
     decision = provider.decide({"question": "test"}, [], 1)
     assert decision.kind == "answer" and seen[0]["stream"] is False
     assert "temperature" in seen[0]["options"]
+    assert seen[0]["think"] is False and seen[0]["options"]["num_ctx"] == 8192
     with pytest.raises(ValueError):
         JsonProvider("ollama", "test", endpoint="http://external.invalid/api/chat")
     provider = JsonProvider(
@@ -160,6 +161,62 @@ def test_local_provider_protocol_and_redirect_rejection(tools):
 
     with pytest.raises(ProviderUnavailable):
         provider.decide({}, [], 1)
+
+
+def test_model_may_omit_ui_scope_but_cannot_override_it(tools):
+    provider = Scripted(
+        Decision(kind="tool", tool="country_performance", arguments={"rank_by": "orders"}),
+        Decision(kind="answer", evidence_ids=["e1"]),
+    )
+    answer = Agent(provider).run(question(), tools.reports)
+    assert answer.status == "answered"
+    assert answer.trace[0].arguments["dataset_id"] == "profile-a"
+    assert answer.evidence["e1"].facts["totals"]["orders"] == 3
+
+
+def test_category_question_explains_required_source(tools):
+    provider = Scripted(Decision(kind="tool", tool="category_performance"))
+    answer = Agent(provider).run(question("Categories", source="sales"), tools.reports)
+    assert answer.status == "clarification" and "catalog snapshot" in answer.text
+    assert not answer.trace
+
+
+def test_local_generation_grammar_hides_bound_scope_and_rejects_invented_filters(tools):
+    seen = []
+    provider = JsonProvider(
+        "ollama",
+        "test",
+        transport=httpx.MockTransport(
+            lambda request: (
+                seen.append(json.loads(request.content))
+                or httpx.Response(
+                    200, json={"message": {"content": '{"kind":"abstain","reason":"unsupported"}'}}
+                )
+            )
+        ),
+    )
+    provider.decide(
+        {"question": "Rank individual items", "results": {}, "history": []}, tools.schemas(), 1
+    )
+    choices = seen[0]["format"]["anyOf"]
+    product = next(
+        c for c in choices if c["properties"].get("tool", {}).get("const") == "product_performance"
+    )
+    params = product["properties"]["arguments"]["properties"]
+    assert "dataset_id" not in params and params["products"]["maxItems"] == 0
+    assert params["countries"]["maxItems"] == 0
+    assert "orders" in params["rank_by"]["enum"]
+    assert not any(c["properties"]["kind"].get("const") == "answer" for c in choices)
+
+
+def test_country_entity_constraints_do_not_route_tools_or_invent_scope():
+    from retailflow_ai.providers import COUNTRY_NAMES, mentioned_countries
+    from retailflow_ai.snapshots import COUNTRIES
+
+    assert set(COUNTRY_NAMES) == COUNTRIES
+    assert mentioned_countries("Just Hungary please") == ["HU"]
+    assert mentioned_countries("Compare Germany and France") == ["DE", "FR"]
+    assert mentioned_countries("Rank markets by euro takings") == []
 
 
 @pytest.mark.parametrize("kind", ["openai", "anthropic", "hosted"])
@@ -185,7 +242,7 @@ def test_json_model_adapter_runs_a_genuine_multistep_tool_loop(tools):
 
     def handler(request):
         body = json.loads(request.content)
-        state = json.loads(body["messages"][1]["content"])["state"]
+        state = json.JSONDecoder().raw_decode(body["messages"][1]["content"])[0]["state"]
         if not state["results"]:
             decision = {
                 "kind": "tool",

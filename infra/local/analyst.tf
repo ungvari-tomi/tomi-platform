@@ -25,12 +25,12 @@ resource "docker_network" "analyst" {
   internal = true
 }
 
-# A model adapter needs outbound connectivity. HTTP allowlists are application
-# controls, not a per-destination network firewall. Mock mode has no egress bridge.
+# Only the analyst and local model server join this internal model network.
 resource "docker_network" "analyst_model" {
-  count  = var.analyst_enabled && var.analyst_provider != "mock" ? 1 : 0
-  name   = "retailflow-analyst-model-access"
-  driver = "bridge"
+  count    = var.ollama_enabled ? 1 : 0
+  name     = "retailflow-analyst-model-access"
+  driver   = "bridge"
+  internal = true
 }
 
 resource "docker_image" "analyst" {
@@ -64,13 +64,13 @@ resource "docker_container" "analyst" {
   capabilities { drop = ["ALL"] }
   networks_advanced { name = docker_network.analyst[0].name }
   dynamic "networks_advanced" {
-    for_each = docker_network.analyst_model
+    for_each = var.analyst_provider == "ollama" ? docker_network.analyst_model : []
     content { name = networks_advanced.value.name }
   }
   env = concat([
     "RETAILFLOW_AI_PROVIDER=${var.analyst_provider}",
     "RETAILFLOW_AI_MODEL=${var.analyst_model}",
-  ], var.analyst_provider == "ollama" ? ["RETAILFLOW_AI_OLLAMA_ENDPOINT=http://host.docker.internal:11434/api/chat"] : [])
+  ], var.analyst_provider == "ollama" ? ["RETAILFLOW_AI_OLLAMA_ENDPOINT=http://retailflow-ollama:11434/api/chat"] : [])
   mounts {
     target    = "/reports"
     source    = docker_volume.reporting[0].name
@@ -87,6 +87,10 @@ resource "docker_container" "analyst" {
   }
   lifecycle {
     precondition {
+      condition     = var.analyst_provider != "ollama" || var.ollama_enabled
+      error_message = "Enable the reviewed local Ollama runtime before selecting its provider."
+    }
+    precondition {
       condition     = var.dashboard_enabled
       error_message = "The analyst requires the existing reporting dashboard volume."
     }
@@ -95,5 +99,5 @@ resource "docker_container" "analyst" {
       error_message = "Choose an installed/supported model explicitly. Terraform never pulls a model."
     }
   }
-  depends_on = [docker_container.reporting_permissions]
+  depends_on = [docker_container.reporting_permissions, docker_container.ollama]
 }

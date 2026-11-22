@@ -160,10 +160,17 @@ class Agent:
         max_calls: int = 6,
         total_seconds: float = 45,
         tool_seconds: float = 10,
+        decision_seconds: float = 15,
     ):
-        if not 1 <= max_calls <= 6 or not 0 < total_seconds <= 60 or not 0 < tool_seconds <= 15:
+        if (
+            not 1 <= max_calls <= 6
+            or not 0 < total_seconds <= 180
+            or not 0 < tool_seconds <= 15
+            or not 0 < decision_seconds <= 60
+        ):
             raise ValueError("Invalid analyst budgets")
         self.provider = provider
+        self.decision_seconds = decision_seconds
         self.pending = None
         self.max_calls, self.total_seconds, self.tool_seconds = (
             max_calls,
@@ -213,10 +220,13 @@ class Agent:
                     )
                 try:
                     provider_future = pool.submit(
-                        self.provider.decide, state, tools.schemas(), min(remaining, 15)
+                        self.provider.decide,
+                        state,
+                        tools.schemas(),
+                        min(remaining, self.decision_seconds),
                     )
                     self.pending = provider_future
-                    decision = provider_future.result(timeout=min(remaining, 15))
+                    decision = provider_future.result(timeout=min(remaining, self.decision_seconds))
                     if not isinstance(decision, Decision):
                         raise ProviderUnavailable()
                 except Exception:
@@ -259,9 +269,39 @@ class Agent:
                 try:
                     if name not in Tools.SCHEMAS:
                         raise DataUnavailable("unapproved_tool")
-                    params = Tools.SCHEMAS[name][0].model_validate_json(
-                        json.dumps(decision.arguments)
-                    )
+                    if name == "category_performance" and request.context.source != "catalog":
+                        return answer(
+                            "clarification",
+                            "Choose the catalog snapshot source for category analysis.",
+                        )
+                    supplied = dict(decision.arguments)
+                    context = request.context
+                    model = Tools.SCHEMAS[name][0]
+                    bound = {}
+                    if "dataset_id" in model.model_fields:
+                        if context.dataset_id is None:
+                            return answer("clarification", MESSAGES["profile"])
+                        if context.start_date is None or context.end_date is None:
+                            return answer("clarification", MESSAGES["period"])
+                        bound = {
+                            key: getattr(context, key)
+                            for key in ("source", "dataset_id", "start_date", "end_date")
+                        }
+                        bound = {
+                            key: value.isoformat() if hasattr(value, "isoformat") else value
+                            for key, value in bound.items()
+                        }
+                    elif name == "inventory_movements":
+                        if (
+                            context.inventory_seed is None
+                            or context.inventory_interval_seconds is None
+                        ):
+                            return answer("clarification", MESSAGES["inventory_profile"])
+                        bound = {
+                            "seed": context.inventory_seed,
+                            "interval_seconds": context.inventory_interval_seconds,
+                        }
+                    params = model.model_validate_json(json.dumps({**bound, **supplied}))
                     arguments = params.model_dump(mode="json")
                     context = request.context
                     if hasattr(params, "dataset_id"):

@@ -1,5 +1,9 @@
 # Agentic AI extension
 
+For the pinned, cloud-disabled CPU model runtime and its optional real-model
+evaluation, see [local Ollama operation](ollama.md). It replaces host installation
+with Terraform-managed internal-only serving; activation is recorded separately.
+
 Branch: `feature/agentic-ai`. The required CI gate completed successfully for
 `05f588dceb8319eff9170bdea3aaa3442e5b0f55` in run 45015922921; fetching main
 confirmed the same HEAD before branch creation. Existing local containers were

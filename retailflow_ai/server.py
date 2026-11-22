@@ -47,7 +47,14 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path == "/health":
-            self.reply(200, {"status": "ok", "provider": self.server.agent.provider.name})
+            self.reply(
+                200,
+                {
+                    "status": "ok",
+                    "provider": self.server.agent.provider.name,
+                    "model": getattr(self.server.agent.provider, "model", None),
+                },
+            )
         elif self.path == "/metadata":
             self.guarded(metadata=True)
         else:
@@ -107,7 +114,12 @@ def main():
     bind = os.environ.get("RETAILFLOW_AI_BIND", "127.0.0.1")
     if bind not in {"127.0.0.1", "0.0.0.0"}:  # nosec B104
         raise ValueError("Invalid analyst bind address")
-    server = AnalystServer((bind, 8090), Agent(provider), Path("/reports"))
+    agent = (
+        Agent(provider, total_seconds=180, decision_seconds=60)
+        if kind == "ollama"
+        else Agent(provider)
+    )
+    server = AnalystServer((bind, 8090), agent, Path("/reports"))
     try:
         server.serve_forever()
     finally:

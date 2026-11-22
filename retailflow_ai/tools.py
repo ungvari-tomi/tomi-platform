@@ -44,19 +44,19 @@ class Tools:
         ),
         "sales_summary": (
             SalesScope,
-            "Summarize observed orders/units and covered EUR cents for one profile and period.",
+            "Overall totals of orders, units and covered EUR revenue; no rankings.",
         ),
         "country_performance": (
             SalesScope,
-            "Rank countries by the chosen metric; exact covered EUR cents included.",
+            "Geographic countries/markets ranked by orders, units or covered EUR revenue.",
         ),
         "product_performance": (
             SalesScope,
-            "Rank product IDs by the chosen metric without expanding variants.",
+            "Individual products/items/SKUs ranked by order frequency, units or EUR revenue.",
         ),
         "category_performance": (
             SalesScope,
-            "Rank latest-observed product categories using catalog sales only.",
+            "Product groups/categories ranked together, not individual items. Catalog only.",
         ),
         "period_comparison": (
             SalesScope,
@@ -72,7 +72,7 @@ class Tools:
         ),
         "catalog_lookup": (
             Lookup,
-            "Look up approved metadata, including retirement; excludes raw MongoDB documents.",
+            "Metadata for one exact product ID: SKU, category, retirement. No rankings.",
         ),
     }
 

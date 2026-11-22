@@ -27,9 +27,10 @@ def select(paths: list[str], *, full: bool = False) -> dict:
     for path in paths:
         if path == "AGENTS.md" or path == "README.md" or path.startswith("docs/"):
             continue
-        if path.startswith(("retailflow_ai/", "infra/analyst/")) or path in {
+        if path.startswith(("retailflow_ai/", "infra/analyst/", "infra/ollama/")) or path in {
             "infra/dashboard/analyst_page.py",
             "infra/local/analyst.tf",
+            "infra/local/ollama.tf",
             "infra/local/dashboard.tf",
         }:
             flags["checks"] = flags["integration"] = True

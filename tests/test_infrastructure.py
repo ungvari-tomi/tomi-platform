@@ -235,6 +235,11 @@ def test_analyst_plan_accepts_scoped_resources_but_rejects_network_deletion():
         "docker_network.analyst_model[0]",
         "docker_image.analyst[0]",
         "docker_container.analyst[0]",
+        "docker_volume.ollama_models[0]",
+        "docker_network.ollama_download[0]",
+        "docker_image.ollama[0]",
+        "docker_container.ollama[0]",
+        "docker_container.ollama_seed[0]",
     ):
         result = infrastructure.plan_summary(
             {

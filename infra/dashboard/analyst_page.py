@@ -22,7 +22,7 @@ def request(path: str, body: dict | None = None) -> dict:
         headers={"Content-Type": "application/json"},
     )
     try:
-        with client.open(req, timeout=50) as response:  # nosec B310
+        with client.open(req, timeout=190) as response:  # nosec B310
             data = response.read(256_001)
             if len(data) > 256_000:
                 raise ValueError()
@@ -45,9 +45,16 @@ def render():
     )
     try:
         health, metadata = request("/health"), request("/metadata")
-        st.caption(f"Provider: {health['provider']}")
+        st.caption(
+            f"Provider: {health['provider']}"
+            + (f" | Model: {health['model']}" if health.get("model") else "")
+        )
         if health["provider"] == "mock":
             st.info("Offline demo mode: deterministic mock planner, not a language model.")
+        else:
+            st.caption(
+                "Local CPU model. Complex questions can take up to three minutes; no cloud calls."
+            )
         sources = [s for s in ("sales", "catalog") if metadata[s]["available"]]
         if not sources:
             st.info("No verified reporting snapshots are available yet.")
