@@ -1,0 +1,10 @@
+*
+!retailflow_ai/
+!retailflow_ai/*.py
+!infra/
+!infra/analyst/
+!infra/analyst/Dockerfile
+!infra/analyst/requirements.txt
+!infra/dbt/
+!infra/dbt/reporting.py
+!infra/dbt/catalog_reporting.py

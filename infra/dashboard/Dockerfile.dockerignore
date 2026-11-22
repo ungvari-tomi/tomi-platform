@@ -25,6 +25,7 @@ retailflow/infrastructure.py
 !infra/dashboard/requirements.txt
 !infra/dashboard/app.py
 !infra/dashboard/catalog_page.py
+!infra/dashboard/analyst_page.py
 !infra/dbt/project/
 !infra/dbt/project/**
 infra/dbt/project/target/

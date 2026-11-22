@@ -117,6 +117,7 @@ class Tools:
             meta = self.reports.metadata()
             return ToolResult(
                 tool=name,
+                status="ok" if any(meta[s]["available"] for s in meta) else "insufficient_data",
                 scope={},
                 facts=meta,
                 evidence=[

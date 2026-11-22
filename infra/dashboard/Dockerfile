@@ -13,6 +13,7 @@ COPY infra/dashboard/app.py /app/app.py
 COPY infra/dbt/reporting.py /app/reporting.py
 COPY infra/dbt/catalog_reporting.py /app/catalog_reporting.py
 COPY infra/dashboard/catalog_page.py /app/catalog_page.py
+COPY infra/dashboard/analyst_page.py /app/analyst_page.py
 USER 10001:10001
 EXPOSE 8501
 CMD ["streamlit", "run", "/app/app.py", "--server.address=0.0.0.0", "--server.port=8501", "--server.enableCORS=true", "--server.enableXsrfProtection=true", "--client.toolbarMode=viewer"]

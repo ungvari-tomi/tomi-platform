@@ -87,6 +87,8 @@ class Reports:
             inventory = sorted(
                 {(r["seed"], r["interval_seconds"]) for r in tables.get("inventory_movements", [])}
             )
+            if len(profiles) > 100 or len(inventory) > 100:
+                raise DataUnavailable("too_many_source_profiles")
             available[source] = {
                 "available": True,
                 "version": manifest["version"],

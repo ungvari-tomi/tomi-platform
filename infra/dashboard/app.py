@@ -18,7 +18,15 @@ def snapshot(root: str, version: str):
 
 def main() -> None:
     st.title("RetailFlow")
-    page = st.sidebar.radio("View", ["Sales overview", "Catalog and inventory"])
+    pages = ["Sales overview", "Catalog and inventory"]
+    if os.environ.get("RETAILFLOW_AI_ENABLED", "false") == "true":
+        pages.append("AI business analyst")
+    page = st.sidebar.radio("View", pages)
+    if page == "AI business analyst":
+        from analyst_page import render
+
+        render()
+        return
     if page == "Catalog and inventory":
         from catalog_page import render
 

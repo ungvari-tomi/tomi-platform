@@ -56,7 +56,7 @@ otherwise document a separate follow-up PR. No remediation capability is planned
 
 The final runbook will record commands, actual evaluations, costs, limitations and
 an interview demonstration. No reliability percentage is claimed before measurement.
-# Phase B — bounded agent
+## Phase B — bounded agent
 
 The explicit Pydantic decision loop avoids a framework dependency. Ollama can
 select any registered tool, inspect evidence and select another tool before
@@ -71,4 +71,30 @@ analysis uses the [OpenAI Responses API](https://developers.openai.com/api/docs/
 with explicit consent, a file-mounted key and `store=false`. Neither adapter has
 been exercised against a real model in this milestone; protocol tests use mock HTTP.
 Offline phase A/B validation: 24 focused tests passed. No service was deployed.
+
+## Phase C — private service and chat
+
+The Streamlit page is enabled only by `RETAILFLOW_AI_ENABLED=true`. It presents
+snapshot/profile/date selectors, bounded conversation history, evidence, execution
+traces and limitations. Changing scope clears history. Service failure stays on
+the AI page; existing sales/catalog pages keep working.
+
+Terraform adds an opt-in `analyst_enabled` component with an internal bridge, no
+published port, non-root UID/GID 10001, read-only root/reporting volume, dropped
+capabilities, 512 MiB memory and 0.5 CPU. Mock mode has no egress network. Ollama
+and explicitly opted-in hosted mode add a model-access bridge. Fixed adapter
+endpoints, disabled proxies and redirects limit application requests; this bridge
+is not a destination-level firewall. A compromised process would have broader
+network access. Only hosted mode mounts its separate private model key file.
+
+No authentication is claimed for the private service or existing loopback UI.
+Keep both local; external/multi-user access requires a separate design. The AI
+service serializes analyses and rejects new work while a timed-out worker exits.
+Chat content/traces stay in bounded Streamlit session memory; neither service logs
+prompts. No conversations or worker artifacts are written to the report volume.
+
+Verified: Terraform validate; 34 focused service/agent/infrastructure tests; one
+real Docker/Streamlit test covering conversations, follow-ups, exact evidence,
+read-only/non-root isolation, disabled mode and unavailable-service regression.
+All report files, networks and volumes in integration tests were disposable.
 

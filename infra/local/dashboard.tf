@@ -26,7 +26,7 @@ resource "docker_image" "dashboard" {
     dockerfile = "infra/dashboard/Dockerfile"
   }
   triggers = {
-    inputs       = sha256(join("", [for name in ["Dockerfile", "requirements.txt", "app.py", "catalog_page.py"] : filesha256("${path.module}/../dashboard/${name}")]))
+    inputs       = sha256(join("", [for name in ["Dockerfile", "requirements.txt", "app.py", "catalog_page.py", "analyst_page.py"] : filesha256("${path.module}/../dashboard/${name}")]))
     reader       = filesha256("${path.module}/../dbt/reporting.py")
     catalog      = filesha256("${path.module}/../dbt/catalog_reporting.py")
     dockerignore = filesha256("${path.module}/../dashboard/Dockerfile.dockerignore")
@@ -59,7 +59,7 @@ resource "docker_container" "dashboard" {
   count          = var.dashboard_enabled ? 1 : 0
   name           = "retailflow-dashboard"
   image          = docker_image.dashboard[0].image_id
-  network_mode   = docker_network.dashboard[0].name
+  network_mode   = var.analyst_enabled ? null : docker_network.dashboard[0].name
   user           = "10001:10001"
   read_only      = true
   must_run       = true
@@ -70,6 +70,11 @@ resource "docker_container" "dashboard" {
   remove_volumes = false
   security_opts  = ["no-new-privileges:true"]
   capabilities { drop = ["ALL"] }
+  env = var.analyst_enabled ? ["RETAILFLOW_AI_ENABLED=true"] : []
+  dynamic "networks_advanced" {
+    for_each = var.analyst_enabled ? [docker_network.dashboard[0].name, docker_network.analyst[0].name] : []
+    content { name = networks_advanced.value }
+  }
   mounts {
     target    = "/reports"
     source    = docker_volume.reporting[0].name
