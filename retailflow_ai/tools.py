@@ -48,11 +48,11 @@ class Tools:
         ),
         "country_performance": (
             SalesScope,
-            "Rank country performance by observed order volume; exact covered EUR cents included.",
+            "Rank countries by the chosen metric; exact covered EUR cents included.",
         ),
         "product_performance": (
             SalesScope,
-            "Rank product IDs by order volume without expanding variants.",
+            "Rank product IDs by the chosen metric without expanding variants.",
         ),
         "category_performance": (
             SalesScope,
@@ -171,10 +171,10 @@ class Tools:
                 groups[row.get(field) or "Unmatched"].append(row)
             facts = {
                 "totals": metrics,
-                "ranked_by": "orders",
+                "ranked_by": params.rank_by,
                 "groups": sorted(
                     [{"key": k, **aggregate(v)} for k, v in groups.items()],
-                    key=lambda r: (-r["orders"], r["key"]),
+                    key=lambda r: (r[params.rank_by] is None, -(r[params.rank_by] or 0), r["key"]),
                 )[: params.limit],
             }
         if name == "period_comparison":

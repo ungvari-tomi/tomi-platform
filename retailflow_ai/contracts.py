@@ -23,6 +23,7 @@ class SalesScope(StrictModel):
         default_factory=list, max_length=4
     )
     limit: int = Field(default=10, ge=1, le=20)
+    rank_by: Literal["orders", "units", "covered_revenue_eur_minor"] = "orders"
 
     @model_validator(mode="after")
     def period(self):

@@ -56,3 +56,19 @@ otherwise document a separate follow-up PR. No remediation capability is planned
 
 The final runbook will record commands, actual evaluations, costs, limitations and
 an interview demonstration. No reliability percentage is claimed before measurement.
+# Phase B — bounded agent
+
+The explicit Pydantic decision loop avoids a framework dependency. Ollama can
+select any registered tool, inspect evidence and select another tool before
+answering. The mock is a deterministic test double, not an LLM. Financial prose
+is rendered from deterministic results: the model selects evidence and its order,
+but cannot insert invented totals. This intentionally limits narrative flexibility.
+Each turn allows six tools, 45 seconds overall and ten seconds per tool. Thread
+timeouts bound the response; running read-only work finishes cooperatively.
+
+Ollama uses its [JSON chat API](https://docs.ollama.com/api/chat). Optional hosted
+analysis uses the [OpenAI Responses API](https://developers.openai.com/api/docs/quickstart)
+with explicit consent, a file-mounted key and `store=false`. Neither adapter has
+been exercised against a real model in this milestone; protocol tests use mock HTTP.
+Offline phase A/B validation: 24 focused tests passed. No service was deployed.
+
