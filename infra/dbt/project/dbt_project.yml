@@ -7,6 +7,9 @@ macro-paths: [macros]
 clean-targets: [target, dbt_packages]
 models:
   retailflow:
+    catalog:
+      +enabled: "{{ var('product_catalog', false) }}"
+      +tags: [catalog]
     reporting:
       +enabled: "{{ var('sales_reporting', false) }}"
       +tags: [reporting]
@@ -18,6 +21,9 @@ models:
       +tags: [parallel]
 data_tests:
   retailflow:
+    catalog:
+      +enabled: "{{ var('product_catalog', false) }}"
+      +tags: [catalog]
     reporting:
       +enabled: "{{ var('sales_reporting', false) }}"
       +tags: [reporting]

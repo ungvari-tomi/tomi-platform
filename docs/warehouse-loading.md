@@ -1,5 +1,9 @@
 # Transactional raw warehouse loading
 
+The opt-in [product revision loader and dbt enrichment](mongodb-warehouse.md)
+are deployed and verified through the paused Airflow catalog workflow. Existing default
+orders/FX source loading remains unchanged.
+
 Status: implemented, tested, and deployed locally through Terraform on 2026-11-02.
 Both running DAGs include extraction and downstream raw loading. Persistent volumes
 were preserved; the post-apply Terraform plan has no changes.

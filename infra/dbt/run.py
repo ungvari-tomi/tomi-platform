@@ -49,6 +49,11 @@ def execute(action: str, database: Path, artifact_root: Path, *, lock_timeout: f
             ["test", "--select", "tag:parallel_freshness"],
             ["build", "--select", "tag:parallel"],
         ],
+        "catalog-pipeline": [
+            ["source", "freshness", "--select", "source:product_catalog_ops.loaded_batches"],
+            ["test", "--select", "tag:catalog_freshness"],
+            ["build", "--select", "tag:catalog"],
+        ],
     }
     if action not in commands:
         raise ValueError("Unsupported dbt action")
@@ -81,6 +86,7 @@ def execute(action: str, database: Path, artifact_root: Path, *, lock_timeout: f
                     "customer-pipeline",
                     "parallel-pipeline",
                     "reporting-pipeline",
+                    "catalog-pipeline",
                 }
                 and index < 2
             ):
@@ -91,6 +97,8 @@ def execute(action: str, database: Path, artifact_root: Path, *, lock_timeout: f
                 arguments = [*arguments, "--vars", '{"customer_pipeline": true}']
             if action == "parallel-pipeline":
                 arguments = [*arguments, "--vars", '{"parallel_ingestion": true}']
+            if action == "catalog-pipeline":
+                arguments = [*arguments, "--vars", '{"product_catalog": true}']
             # Fixed CLI executable and validated action.
             result = subprocess.run(  # nosec B603
                 [
@@ -135,6 +143,7 @@ def main() -> None:
             "reporting-pipeline",
             "customer-pipeline",
             "parallel-pipeline",
+            "catalog-pipeline",
         ],
         default="check",
         nargs="?",

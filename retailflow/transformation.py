@@ -12,12 +12,18 @@ from uuid import uuid4
 
 
 def scheduled_build(
-    dag_id: str, run_id: str, try_number: int, *, customers: bool = False, parallel: bool = False
+    dag_id: str,
+    run_id: str,
+    try_number: int,
+    *,
+    customers: bool = False,
+    parallel: bool = False,
+    catalog: bool = False,
 ) -> dict:
-    if customers and parallel:
+    if sum((customers, parallel, catalog)) > 1:
         raise ValueError("Select only one opt-in dbt pipeline")
     reporting = (
-        not (customers or parallel)
+        not (customers or parallel or catalog)
         and os.environ.get("RETAILFLOW_DASHBOARD_ENABLED", "false") == "true"
     )
     identity = hashlib.sha256(json.dumps([dag_id, run_id, try_number]).encode()).hexdigest()
@@ -62,7 +68,9 @@ def scheduled_build(
             "/opt/dbt/venv/bin/python",
             "-I",
             "/opt/dbt/run.py",
-            "parallel-pipeline"
+            "catalog-pipeline"
+            if catalog
+            else "parallel-pipeline"
             if parallel
             else "customer-pipeline"
             if customers
@@ -88,13 +96,13 @@ def scheduled_build(
         if len(paths) != 1:
             raise RuntimeError("Missing dbt freshness evidence")
         checks = json.loads(paths[0].read_text(encoding="utf-8"))["results"]
-        expected = 1 if (customers or parallel) and phase == "freshness_tests" else 2
+        expected = 1 if catalog or ((customers or parallel) and phase == "freshness_tests") else 2
         if len(checks) != expected or any(row["status"] != "pass" for row in checks):
             raise RuntimeError("dbt freshness checks did not all pass")
     return {
         "artifact_directory": str(directory),
         "models_succeeded": sum(row["unique_id"].startswith("model.") for row in records),
         "tests_passed": sum(row["unique_id"].startswith("test.") for row in records),
-        "freshness_sources_passed": 2,
-        "freshness_tests_passed": 1 if customers or parallel else 2,
+        "freshness_sources_passed": 1 if catalog else 2,
+        "freshness_tests_passed": 1 if customers or parallel or catalog else 2,
     }

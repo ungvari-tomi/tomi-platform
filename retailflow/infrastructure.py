@@ -287,6 +287,12 @@ def main() -> None:
     if dashboard_enabled not in {"true", "false"}:
         parser.error("Dashboard enablement must be true or false")
     env["TF_VAR_dashboard_enabled"] = dashboard_enabled
+    catalog_enabled = env.get(
+        "RETAILFLOW_CATALOG_ENABLED", local.get("RETAILFLOW_CATALOG_ENABLED", "false")
+    )
+    if catalog_enabled not in {"true", "false"}:
+        parser.error("Catalog pipeline enablement must be true or false")
+    env["TF_VAR_catalog_pipeline_enabled"] = catalog_enabled
     env["TF_VAR_event_interval_seconds"] = env.get(
         "RETAILFLOW_EVENT_INTERVAL_SECONDS", local.get("RETAILFLOW_EVENT_INTERVAL_SECONDS", "600")
     )

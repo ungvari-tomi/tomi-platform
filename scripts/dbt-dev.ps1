@@ -2,7 +2,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Position = 0)]
-    [ValidateSet('check', 'parse', 'build', 'freshness', 'pipeline')]
+    [ValidateSet('check', 'parse', 'build', 'freshness', 'pipeline', 'catalog-pipeline')]
     [string]$Action = 'parse',
     [string]$ProjectDirectory,
     [string]$ArtifactDirectory,

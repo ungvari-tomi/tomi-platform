@@ -26,6 +26,24 @@ def test_catalog_changes_select_isolated_contract_and_integration_tests():
     assert ci_select.select(["tests/test_mongodb_container.py"])["integration"]
 
 
+@pytest.mark.parametrize(
+    "path",
+    [
+        "retailflow/product_catalog.py",
+        "infra/dbt/project/models/catalog/current_products.sql",
+        "infra/dbt/project/tests/catalog/catalog_integrity.sql",
+        "infra/dbt/project/models/catalog_sources.yml",
+    ],
+)
+def test_product_warehouse_changes_select_loader_and_real_dbt(path):
+    selected = ci_select.select([path])
+    assert selected["checks"] and selected["integration"]
+    assert selected["tests"] == [
+        "tests/test_product_catalog.py",
+        "tests/test_product_catalog_dbt.py",
+    ]
+
+
 @pytest.mark.parametrize("path", [".sqlfluff", ".sqlfluffignore"])
 def test_sql_lint_configuration_selects_style_checks_without_images(path):
     selected = ci_select.select([path])

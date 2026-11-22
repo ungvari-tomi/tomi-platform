@@ -1,0 +1,20 @@
+version: 2
+sources:
+  - name: product_catalog
+    schema: raw
+    config:
+      enabled: "{{ var('product_catalog', false) }}"
+    tables:
+      - name: product_versions
+  - name: product_catalog_ops
+    schema: ops
+    config:
+      enabled: "{{ var('product_catalog', false) }}"
+    tables:
+      - name: product_batch_records
+      - name: loaded_batches
+        config:
+          loaded_at_field: retrieved_at
+          freshness:
+            error_after: {count: 24, period: hour}
+            filter: source = 'product-catalog/products-v1'

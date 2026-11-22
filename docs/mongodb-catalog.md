@@ -106,7 +106,10 @@ Stage 2 is implemented, tested in disposable storage and deployed locally throug
 an owner-approved additive Terraform plan. It remains opt-in for new installations. See the
 [extraction runbook](mongodb-extraction.md) for recovery semantics, controls,
 verification commands and the saved-plan workflow. Its first 20-product batch
-and replay were verified in deployed Azurite; warehouse enrichment remains planned.
+and replay were verified in deployed Azurite. Stage 3 product history, transactional
+loading and opt-in dbt enrichment are deployed and verified locally. The
+[Airflow catalog workflow](catalog-workflow.md) passed a controlled run and remains
+paused; see also [the warehouse milestone](mongodb-warehouse.md).
 
 Stage 2 uses bounded full snapshots of this 20-document catalog and
 revision/hash reconciliation. Incremental extraction can then add `(updated_at,

@@ -27,6 +27,16 @@ def select(paths: list[str], *, full: bool = False) -> dict:
     for path in paths:
         if path == "AGENTS.md" or path == "README.md" or path.startswith("docs/"):
             continue
+        if (
+            path == "retailflow/product_catalog.py"
+            or path.startswith(
+                ("infra/dbt/project/models/catalog/", "infra/dbt/project/tests/catalog/")
+            )
+            or path == "infra/dbt/project/models/catalog_sources.yml"
+        ):
+            flags["checks"] = flags["integration"] = True
+            targets.update({"tests/test_product_catalog.py", "tests/test_product_catalog_dbt.py"})
+            continue
         if path.startswith("infra/mongodb/"):
             flags["checks"] = flags["integration"] = True
             flags["terraform"] |= "/terraform/" in path

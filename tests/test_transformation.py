@@ -9,11 +9,17 @@ from retailflow import transformation
 
 
 @pytest.mark.parametrize(
-    "customers,parallel,reporting",
-    [(False, False, False), (True, False, False), (False, True, False), (False, False, True)],
+    "customers,parallel,reporting,catalog",
+    [
+        (False, False, False, False),
+        (True, False, False, False),
+        (False, True, False, False),
+        (False, False, True, False),
+        (False, False, False, True),
+    ],
 )
 def test_build_sanitizes_environment_and_returns_small_summary(
-    monkeypatch, tmp_path: Path, customers, parallel, reporting
+    monkeypatch, tmp_path: Path, customers, parallel, reporting, catalog
 ):
     monkeypatch.setenv("RETAILFLOW_DBT_ARTIFACT_DIR", str(tmp_path))
     monkeypatch.setenv("RETAILFLOW_DASHBOARD_ENABLED", "true" if reporting else "false")
@@ -28,7 +34,9 @@ def test_build_sanitizes_environment_and_returns_small_summary(
 
     def execute(command, *, env, check, timeout):
         action = (
-            "parallel-pipeline"
+            "catalog-pipeline"
+            if catalog
+            else "parallel-pipeline"
             if parallel
             else "customer-pipeline"
             if customers
@@ -62,13 +70,18 @@ def test_build_sanitizes_environment_and_returns_small_summary(
         ]:
             path = target.parent / phase / "target"
             path.mkdir(parents=True)
-            count = 1 if (customers or parallel) and phase == "freshness_tests" else 2
+            count = 1 if catalog or ((customers or parallel) and phase == "freshness_tests") else 2
             (path / filename).write_text(json.dumps({"results": [{"status": "pass"}] * count}))
         return SimpleNamespace(returncode=0)
 
     monkeypatch.setattr(transformation.subprocess, "run", execute)
     result = transformation.scheduled_build(
-        "retailflow_orders", "manual__a/b", 1, customers=customers, parallel=parallel
+        "retailflow_orders",
+        "manual__a/b",
+        1,
+        customers=customers,
+        parallel=parallel,
+        catalog=catalog,
     )
     assert result["models_succeeded"] == 1 and result["tests_passed"] == 1
     directory = Path(result["artifact_directory"])

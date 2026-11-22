@@ -180,7 +180,7 @@ Private plans, backups and verification reports are retained
 under ignored `artifacts/mongodb-extraction-deployment/`. These are local
 deployment checks; they do not attest hosted CI success for this milestone.
 
-Next milestone: append product revisions to DuckDB under the common warehouse
-lock and atomic batch ledger, then add opt-in dbt models and left-join enrichment
-without changing order counts or revenue. Scheduling remains a separately reviewed
-step, with a new DAG initially paused.
+The [warehouse milestone](mongodb-warehouse.md) implements appending product
+revisions under the common lock and atomic batch ledger, opt-in dbt models and
+left-join enrichment. It is now deployed and verified with the initially paused
+[Airflow catalog workflow](catalog-workflow.md).

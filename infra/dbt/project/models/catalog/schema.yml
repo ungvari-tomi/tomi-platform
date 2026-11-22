@@ -1,0 +1,51 @@
+version: 2
+models:
+  - name: stg_product_versions
+    description: Observed immutable revisions, exact canonical BSON JSON and source lineage; synthetic metadata only.
+    data_tests:
+      - unique_business_key:
+          arguments:
+            columns: [product_id, revision]
+    columns:
+      - name: product_id
+        data_tests: [not_null]
+      - name: revision
+        data_tests: [not_null]
+      - name: schema_version
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [1]
+                quote: false
+      - name: catalog_manifest
+        data_tests: [not_null]
+      - name: catalog_observed_at
+        data_tests: [not_null]
+      - name: category
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [electronics, apparel, homeware]
+      - name: catalog_status
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [active, retired]
+  - name: current_products
+    description: Highest observed revision per product, including retirement; not an as-of-order dimension.
+    columns:
+      - name: product_id
+        data_tests: [unique, not_null]
+      - name: sku
+        data_tests: [unique, not_null]
+  - name: catalog_orders
+    description: Orders enriched with latest observed product metadata; unmatched facts and integer monetary amounts retained.
+    data_tests:
+      - unique_business_key:
+          arguments:
+            columns: [dataset_id, order_id]
+  - name: catalog_inventory
+    description: Inventory movements enriched at unchanged event grain; not opening stock or order revenue.
+    columns:
+      - name: event_id
+        data_tests: [unique, not_null]

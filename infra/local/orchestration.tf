@@ -152,22 +152,23 @@ resource "docker_image" "airflow" {
     dockerfile = "infra/orchestration/airflow.Dockerfile"
   }
   triggers = {
-    application  = local.application_hash
-    dags         = filesha256("${path.module}/../../dags/retailflow_extraction.py")
-    dockerfile   = filesha256("${path.module}/../orchestration/airflow.Dockerfile")
-    constraints  = filesha256("${path.module}/../orchestration/constraints.txt")
-    startup      = filesha256("${path.module}/../orchestration/start.py")
-    duckdb       = filesha256("${path.module}/../orchestration/duckdb-requirements.txt")
-    dbt_runtime  = filesha256("${path.module}/../dbt/run.py")
-    reporting    = filesha256("${path.module}/../dbt/reporting.py")
-    dbt_packages = filesha256("${path.module}/../dbt/requirements.txt")
+    application     = local.application_hash
+    dags            = sha256(join("", [for name in sort(tolist(fileset("${path.module}/../../dags", "*.py"))) : filesha256("${path.module}/../../dags/${name}")]))
+    catalog_runtime = sha256(join("", [for name in ["catalog.py", "extract.py", "extraction/requirements.txt"] : filesha256("${path.module}/../mongodb/${name}")]))
+    dockerfile      = filesha256("${path.module}/../orchestration/airflow.Dockerfile")
+    constraints     = filesha256("${path.module}/../orchestration/constraints.txt")
+    startup         = filesha256("${path.module}/../orchestration/start.py")
+    duckdb          = filesha256("${path.module}/../orchestration/duckdb-requirements.txt")
+    dbt_runtime     = filesha256("${path.module}/../dbt/run.py")
+    reporting       = filesha256("${path.module}/../dbt/reporting.py")
+    dbt_packages    = filesha256("${path.module}/../dbt/requirements.txt")
     dbt_project = sha256(join("", [
       for name in sort(tolist(setunion(
         fileset("${path.module}/../dbt/project", "**/*.sql"),
         fileset("${path.module}/../dbt/project", "**/*.yml")
       ))) : filesha256("${path.module}/../dbt/project/${name}")
     ]))
-    dockerignore = filesha256("${path.module}/../../.dockerignore")
+    dockerignore = filesha256("${path.module}/../orchestration/airflow.Dockerfile.dockerignore")
   }
 }
 
@@ -245,9 +246,15 @@ resource "docker_container" "airflow" {
     for_each = each.key == "dag-processor" ? [1] : []
     content { name = docker_network.mailpit.name }
   }
+  dynamic "networks_advanced" {
+    for_each = each.key == "scheduler" && var.catalog_pipeline_enabled ? [1] : []
+    content { name = "retailflow-product-catalog" }
+  }
   user      = "50000:0"
   group_add = each.key == "scheduler" ? ["10001"] : []
-  env = concat(local.airflow_env, each.key == "scheduler" ? [
+  env = concat(local.airflow_env, each.key == "scheduler" && var.catalog_pipeline_enabled ? [
+    "RETAILFLOW_CATALOG_ENABLED=true"
+    ] : [], each.key == "scheduler" ? [
     "RETAILFLOW_DUCKDB_PATH=/warehouse/retailflow.duckdb"
     ] : [], each.key == "scheduler" && var.customer_pipeline_enabled ? [
     "RETAILFLOW_CUSTOMER_PRIVACY_KEY_FILE=/run/retailflow-secrets/customer.json"
@@ -295,6 +302,17 @@ resource "docker_container" "airflow" {
       target = "/reports"
       source = docker_volume.reporting[0].name
       type   = "volume"
+    }
+  }
+  dynamic "mounts" {
+    for_each = each.key == "scheduler" && var.catalog_pipeline_enabled ? {
+      "catalog-reader.json" = "reader.json", "catalog-azurite-key" = "azurite-key"
+    } : {}
+    content {
+      target    = "/run/retailflow-secrets/${mounts.key}"
+      source    = "${local.catalog_secrets_mount}/${mounts.value}"
+      type      = "bind"
+      read_only = true
     }
   }
   dynamic "mounts" {

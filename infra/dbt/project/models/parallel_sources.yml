@@ -3,7 +3,7 @@ sources:
   - name: inventory_stream
     schema: streaming
     config:
-      enabled: "{{ var('parallel_ingestion', false) }}"
+      enabled: "{{ var('parallel_ingestion', false) or var('product_catalog', false) }}"
     tables:
       - name: inventory_movements
         config:

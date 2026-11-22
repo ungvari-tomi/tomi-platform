@@ -1,5 +1,9 @@
 # Terraform-managed dbt Core runtime
 
+[Product catalog history and enrichment](mongodb-warehouse.md) adds a tested,
+opt-in `catalog-pipeline` action, deployed and verified on 2026-11-22. Default builds keep
+catalog resources disabled.
+
 SQL uses uppercase keywords, function names, types and SQL NULL/boolean literals.
 Keep column/table names, aliases, quoted values and Jinja syntax unchanged. Run
 `uv run --locked sqlfluff lint infra/dbt/project` to check, or replace `lint`

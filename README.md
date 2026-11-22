@@ -74,8 +74,11 @@ Terraform root, authentication, schema validation, indexes and verified recovery
 leave the deployed pipelines and protected volumes unchanged. Reader-only
 extraction into immutable Azurite JSON batches is deployed as a Terraform-managed
 one-shot component. Its first 20-product batch and retry replay are verified;
-there is no catalog schedule yet. Warehouse enrichment remains next.
-See the [catalog design](docs/mongodb-catalog.md) and [extraction runbook](docs/mongodb-extraction.md).
+product revision history and opt-in dbt order/inventory enrichment are deployed.
+The new Airflow catalog workflow passed a complete verification run and remains
+paused; a six-hour cadence is configured for future activation. See the
+[catalog design](docs/mongodb-catalog.md), [extraction runbook](docs/mongodb-extraction.md),
+[warehouse models](docs/mongodb-warehouse.md) and [Airflow workflow](docs/catalog-workflow.md).
 
 ## What each part does
 
