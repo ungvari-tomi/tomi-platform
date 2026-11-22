@@ -28,6 +28,7 @@ COPY --from=dbt_runtime /opt/dbt/venv /opt/dbt/venv
 COPY --from=catalog_runtime /opt/catalog /opt/catalog
 COPY infra/dbt/run.py /opt/dbt/run.py
 COPY infra/dbt/reporting.py /opt/dbt/reporting.py
+COPY infra/dbt/catalog_reporting.py /opt/dbt/catalog_reporting.py
 COPY infra/dbt/project /opt/dbt/project
 ENV PYTHONPATH=/opt/airflow PYTHONDONTWRITEBYTECODE=1
 CMD ["python", "/opt/airflow/start.py", "api-server"]

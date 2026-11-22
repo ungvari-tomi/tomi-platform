@@ -26,9 +26,10 @@ resource "docker_image" "dashboard" {
     dockerfile = "infra/dashboard/Dockerfile"
   }
   triggers = {
-    inputs       = sha256(join("", [for name in ["Dockerfile", "requirements.txt", "app.py"] : filesha256("${path.module}/../dashboard/${name}")]))
+    inputs       = sha256(join("", [for name in ["Dockerfile", "requirements.txt", "app.py", "catalog_page.py"] : filesha256("${path.module}/../dashboard/${name}")]))
     reader       = filesha256("${path.module}/../dbt/reporting.py")
-    dockerignore = filesha256("${path.module}/../../.dockerignore")
+    catalog      = filesha256("${path.module}/../dbt/catalog_reporting.py")
+    dockerignore = filesha256("${path.module}/../dashboard/Dockerfile.dockerignore")
   }
 }
 

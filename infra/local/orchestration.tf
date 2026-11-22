@@ -161,6 +161,7 @@ resource "docker_image" "airflow" {
     duckdb          = filesha256("${path.module}/../orchestration/duckdb-requirements.txt")
     dbt_runtime     = filesha256("${path.module}/../dbt/run.py")
     reporting       = filesha256("${path.module}/../dbt/reporting.py")
+    catalog_report  = filesha256("${path.module}/../dbt/catalog_reporting.py")
     dbt_packages    = filesha256("${path.module}/../dbt/requirements.txt")
     dbt_project = sha256(join("", [
       for name in sort(tolist(setunion(

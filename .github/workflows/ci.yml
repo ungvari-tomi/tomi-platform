@@ -76,7 +76,7 @@ jobs:
       - name: SQL lint
         run: uv run --locked sqlfluff lint infra/dbt/project
       - name: Python security checks
-        run: uv run --locked bandit -r retailflow dags infra/duckdb infra/dbt/run.py infra/dbt/reporting.py infra/dashboard/app.py infra/mongodb/catalog.py infra/mongodb/extract.py infra/orchestration/start.py scripts -q
+        run: uv run --locked bandit -r retailflow dags infra/duckdb infra/dbt/run.py infra/dbt/reporting.py infra/dbt/catalog_reporting.py infra/dashboard/app.py infra/dashboard/catalog_page.py infra/mongodb/catalog.py infra/mongodb/extract.py infra/orchestration/start.py scripts -q
       - name: Tests
         env:
           RETAILFLOW_SELECTED_TESTS: ${{ needs.changes.outputs.tests }}

@@ -18,6 +18,12 @@ def snapshot(root: str, version: str):
 
 def main() -> None:
     st.title("RetailFlow")
+    page = st.sidebar.radio("View", ["Sales overview", "Catalog and inventory"])
+    if page == "Catalog and inventory":
+        from catalog_page import render
+
+        render(Path(os.environ.get("RETAILFLOW_REPORTING_DIR", "/reports")))
+        return
     st.caption("SALES OVERVIEW · Synthetic retail data")
     st.button("Refresh data", help="Check for the latest successfully published snapshot.")
     root = Path(os.environ.get("RETAILFLOW_REPORTING_DIR", "/reports"))

@@ -1,8 +1,9 @@
 # Airflow product catalog workflow
 
-Deployed locally on 2026-11-22. `retailflow_catalog` is **paused** after a successful
-controlled verification run. Its configured cadence is every six hours UTC,
-with catchup disabled and one active run. Recurring execution is not active.
+Deployed locally on 2026-11-22. `retailflow_catalog` is **active** every six hours
+UTC, with catchup disabled and one active run. The owner-approved activation and
+[Streamlit reporting extension](catalog-dashboard.md) passed an immediate manual
+verification run; the next future cron execution is recorded separately.
 
 ```mermaid
 flowchart LR
@@ -49,7 +50,7 @@ Scheduler UID 50000 accesses warehouse storage through group 10001 and setgid
 2770 directories. All revision records, memberships and ledger rows commit in one
 transaction. No other source namespace or historical facts are rewritten.
 
-The dbt task invokes the existing isolated wrapper with `catalog-pipeline`, keeping
+The plain dbt task invokes the isolated wrapper with `catalog-pipeline`, keeping
 the warehouse lock through catalog source freshness, per-product freshness tests
 and the tagged build. It bypasses sales publication and forwards no reader/blob
 credential or secret-file environment variable. Per-attempt source/test/build
@@ -60,6 +61,12 @@ Product metadata changes only through supported source CRUD/revisions. A new
 snapshot can confirm unchanged products; it does not manufacture random revisions.
 The analytical joins use latest observed metadata, not historical order-time
 validity, and preserve unmatched facts and original monetary units.
+
+With the dashboard enabled, this task now selects `catalog-reporting-pipeline`:
+order/FX/catalog/inventory freshness, four tagged freshness checks, eight selected
+models and separate catalog reporting publication. It publishes only the new
+catalog pointer, leaving the original sales reporting action intact. See the
+[catalog dashboard contract and activation evidence](catalog-dashboard.md).
 
 ## Configuration and operation
 
@@ -75,8 +82,9 @@ Do not apply disabled defaults as a way to pause services. To pause the catalog
 workflow, use its Airflow pause control. Source secrets remain ignored files, with
 restricted NTFS ACLs and non-root readability checked before deployment.
 
-The new DAG is visible at the local Airflow UI, <http://127.0.0.1:8080>. It remains
-paused until recurring operation is explicitly enabled. Do not change direct
+The DAG is visible at the local Airflow UI, <http://127.0.0.1:8080>. It is active in
+this installation after explicit owner approval; new installations still start
+paused for verification. Do not change direct
 database/file paths or mount the Docker socket to run tasks. Data freshness belongs
 to dbt; operational monitoring remains the existing on-demand health report.
 
@@ -113,7 +121,9 @@ catalog dependency audit found no known vulnerabilities. Container tests cover
 the real SDK graph, driver isolation, scheduler UID/GID loading/replay and the
 complete catalog dbt wrapper, alongside existing DAG construction.
 
-The catalog DAG was returned to paused after verification. This is local deployment
+The catalog DAG was returned to paused after the first foundation verification;
+the subsequent owner-approved activation is documented in the dashboard runbook.
+This is local deployment
 evidence, not a hosted-CI or production/compliance attestation. The repository
 still requires separate explicit approval for committing/pushing this milestone.
 

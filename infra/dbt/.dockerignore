@@ -4,6 +4,7 @@
 !requirements.txt
 !run.py
 !reporting.py
+!catalog_reporting.py
 !project/
 !project/**
 project/target/

@@ -11,6 +11,7 @@ RUN pip install --no-cache-dir --require-hashes --only-binary=:all: -r /app/requ
     && chown 10001:10001 /warehouse /artifacts
 COPY run.py /app/run.py
 COPY reporting.py /app/reporting.py
+COPY catalog_reporting.py /app/catalog_reporting.py
 COPY project /app/project
 USER 10001:10001
 ENTRYPOINT ["python", "/app/run.py"]

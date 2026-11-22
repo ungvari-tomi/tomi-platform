@@ -19,6 +19,7 @@ retailflow/infrastructure.py
 !infra/dbt/requirements.txt
 !infra/dbt/run.py
 !infra/dbt/reporting.py
+!infra/dbt/catalog_reporting.py
 !infra/dashboard/
 !infra/dashboard/Dockerfile
 !infra/dashboard/requirements.txt

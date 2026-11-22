@@ -27,6 +27,25 @@ def select(paths: list[str], *, full: bool = False) -> dict:
     for path in paths:
         if path == "AGENTS.md" or path == "README.md" or path.startswith("docs/"):
             continue
+        if path.startswith("infra/dashboard/") or path in {
+            "infra/dbt/catalog_reporting.py",
+            "infra/dbt/reporting.py",
+            "infra/dbt/project/tests/catalog/catalog_inventory_freshness.sql",
+        }:
+            flags["checks"] = flags["integration"] = True
+            flags["dependencies"] |= path.endswith(
+                ("uv.lock", "pyproject.toml", "requirements.txt")
+            )
+            targets.update(
+                {
+                    "tests/test_reporting.py",
+                    "tests/test_catalog_reporting.py",
+                    "tests/test_dashboard_container.py",
+                    "tests/test_catalog_dashboard_container.py",
+                    "tests/test_transformation.py",
+                }
+            )
+            continue
         if (
             path == "retailflow/product_catalog.py"
             or path.startswith(

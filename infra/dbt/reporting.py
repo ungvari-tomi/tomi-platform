@@ -56,8 +56,11 @@ def write_json(path: Path, value: dict) -> None:
     path.chmod(0o640)
 
 
-def validate_report(db) -> None:
-    invalid = db.execute("""SELECT COUNT(*) FROM daily_sales
+def validate_report(db, table: str = "daily_sales") -> None:
+    if table not in {"daily_sales", "catalog_sales"}:
+        raise ValueError("Unsupported aggregate table")
+    invalid = db.execute(
+        """SELECT COUNT(*) FROM daily_sales
         WHERE dataset_id IS NULL OR order_date IS NULL OR country_code IS NULL
            OR product_id IS NULL OR currency_code IS NULL OR latest_order_at IS NULL
            OR order_count IS NULL OR order_count <= 0
@@ -67,10 +70,15 @@ def validate_report(db) -> None:
            OR fx_covered_orders + fx_uncovered_orders != order_count
            OR (fx_covered_orders = 0 AND revenue_eur_minor IS NOT NULL)
            OR (fx_covered_orders > 0 AND (revenue_eur_minor IS NULL OR revenue_eur_minor <= 0))
-           OR CAST(TIMEZONE('UTC', latest_order_at) AS DATE) != order_date""").fetchone()[0]
-    duplicate = db.execute("""SELECT COUNT(*) FROM (
+           OR CAST(TIMEZONE('UTC', latest_order_at) AS DATE) != order_date""".replace(  # nosec B608
+            "daily_sales", table
+        )
+    ).fetchone()[0]
+    duplicate = db.execute(
+        """SELECT COUNT(*) FROM (
         SELECT dataset_id, order_date, country_code, product_id, currency_code
-        FROM daily_sales GROUP BY ALL HAVING COUNT(*) > 1)""").fetchone()[0]
+        FROM daily_sales GROUP BY ALL HAVING COUNT(*) > 1)""".replace("daily_sales", table)  # nosec B608
+    ).fetchone()[0]
     if invalid or duplicate:
         raise ValueError("Reporting aggregate contract failed")
 

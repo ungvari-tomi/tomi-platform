@@ -54,10 +54,27 @@ def execute(action: str, database: Path, artifact_root: Path, *, lock_timeout: f
             ["test", "--select", "tag:catalog_freshness"],
             ["build", "--select", "tag:catalog"],
         ],
+        "catalog-reporting-pipeline": [
+            [
+                "source",
+                "freshness",
+                "--select",
+                "source:product_catalog_ops.loaded_batches source:retailflow_raw.orders "
+                "source:retailflow_ops.loaded_batches source:inventory_stream.inventory_movements",
+            ],
+            [
+                "test",
+                "--select",
+                "tag:freshness tag:catalog_freshness tag:catalog_report_freshness",
+            ],
+            ["build", "--select", "tag:catalog +daily_sales"],
+        ],
     }
     if action not in commands:
         raise ValueError("Unsupported dbt action")
-    if action == "reporting-pipeline" and not os.environ.get("RETAILFLOW_REPORTING_DIR"):
+    if action in {"reporting-pipeline", "catalog-reporting-pipeline"} and not os.environ.get(
+        "RETAILFLOW_REPORTING_DIR"
+    ):
         raise ValueError("Reporting publication directory is required")
     database = database.resolve()
     executable = shutil.which("dbt")
@@ -87,6 +104,7 @@ def execute(action: str, database: Path, artifact_root: Path, *, lock_timeout: f
                     "parallel-pipeline",
                     "reporting-pipeline",
                     "catalog-pipeline",
+                    "catalog-reporting-pipeline",
                 }
                 and index < 2
             ):
@@ -99,6 +117,19 @@ def execute(action: str, database: Path, artifact_root: Path, *, lock_timeout: f
                 arguments = [*arguments, "--vars", '{"parallel_ingestion": true}']
             if action == "catalog-pipeline":
                 arguments = [*arguments, "--vars", '{"product_catalog": true}']
+            if action == "catalog-reporting-pipeline":
+                arguments = [
+                    *arguments,
+                    "--vars",
+                    json.dumps(
+                        {
+                            "product_catalog": True,
+                            "catalog_reporting": True,
+                            "sales_reporting": True,
+                            "check_freshness": True,
+                        }
+                    ),
+                ]
             # Fixed CLI executable and validated action.
             result = subprocess.run(  # nosec B603
                 [
@@ -126,6 +157,16 @@ def execute(action: str, database: Path, artifact_root: Path, *, lock_timeout: f
             (invocation / "report-publication.json").write_text(
                 json.dumps(publication, indent=2), encoding="utf-8"
             )
+        if action == "catalog-reporting-pipeline":
+            publisher = runpy.run_path(str(project.parent / "catalog_reporting.py"))["publish"]
+            publication = publisher(
+                database,
+                Path(os.environ["RETAILFLOW_REPORTING_DIR"]) / "catalog",
+                warehouse_lock=warehouse_lock,
+            )
+            (invocation / "catalog-publication.json").write_text(
+                json.dumps(publication, indent=2), encoding="utf-8"
+            )
     print(json.dumps({"action": action, "status": "success", "artifacts": str(invocation)}))
     return 0
 
@@ -144,6 +185,7 @@ def main() -> None:
             "customer-pipeline",
             "parallel-pipeline",
             "catalog-pipeline",
+            "catalog-reporting-pipeline",
         ],
         default="check",
         nargs="?",

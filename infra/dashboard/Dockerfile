@@ -11,6 +11,8 @@ RUN pip install --no-cache-dir --require-hashes --only-binary=:all: -r /app/requ
     && mkdir /reports && chown 10001:10001 /reports && chmod 2770 /reports
 COPY infra/dashboard/app.py /app/app.py
 COPY infra/dbt/reporting.py /app/reporting.py
+COPY infra/dbt/catalog_reporting.py /app/catalog_reporting.py
+COPY infra/dashboard/catalog_page.py /app/catalog_page.py
 USER 10001:10001
 EXPOSE 8501
 CMD ["streamlit", "run", "/app/app.py", "--server.address=0.0.0.0", "--server.port=8501", "--server.enableCORS=true", "--server.enableXsrfProtection=true", "--client.toolbarMode=viewer"]

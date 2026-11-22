@@ -16,6 +16,7 @@ from retailflow import transformation
         (False, True, False, False),
         (False, False, True, False),
         (False, False, False, True),
+        (False, False, True, True),
     ],
 )
 def test_build_sanitizes_environment_and_returns_small_summary(
@@ -34,7 +35,9 @@ def test_build_sanitizes_environment_and_returns_small_summary(
 
     def execute(command, *, env, check, timeout):
         action = (
-            "catalog-pipeline"
+            "catalog-reporting-pipeline"
+            if catalog and reporting
+            else "catalog-pipeline"
             if catalog
             else "parallel-pipeline"
             if parallel
@@ -70,7 +73,13 @@ def test_build_sanitizes_environment_and_returns_small_summary(
         ]:
             path = target.parent / phase / "target"
             path.mkdir(parents=True)
-            count = 1 if catalog or ((customers or parallel) and phase == "freshness_tests") else 2
+            count = (
+                4
+                if catalog and reporting
+                else 1
+                if catalog or ((customers or parallel) and phase == "freshness_tests")
+                else 2
+            )
             (path / filename).write_text(json.dumps({"results": [{"status": "pass"}] * count}))
         return SimpleNamespace(returncode=0)
 

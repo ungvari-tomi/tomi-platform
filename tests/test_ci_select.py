@@ -12,6 +12,26 @@ def test_documentation_only_skips_runtime_jobs():
     assert selected["tests"] == []
 
 
+@pytest.mark.parametrize(
+    "path",
+    [
+        "infra/dbt/catalog_reporting.py",
+        "infra/dashboard/catalog_page.py",
+        "infra/dbt/project/tests/catalog/catalog_inventory_freshness.sql",
+    ],
+)
+def test_catalog_dashboard_changes_include_publication_and_ui_tests(path):
+    selected = ci_select.select([path])
+    assert selected["checks"] and selected["integration"]
+    assert set(selected["tests"]) == {
+        "tests/test_reporting.py",
+        "tests/test_catalog_reporting.py",
+        "tests/test_dashboard_container.py",
+        "tests/test_catalog_dashboard_container.py",
+        "tests/test_transformation.py",
+    }
+
+
 def test_catalog_changes_select_isolated_contract_and_integration_tests():
     selected = ci_select.select(["infra/mongodb/catalog.py"])
     assert selected["checks"] and selected["integration"]

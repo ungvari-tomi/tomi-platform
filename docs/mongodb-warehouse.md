@@ -142,8 +142,9 @@ There is no automatic deletion, historical overwrite or live restore. Existing
 checkpoint-and-close backups cover the new tables; restore still targets a new
 file. Cleanup/correction needs explicit scope and owner review.
 
-The [Airflow catalog workflow](catalog-workflow.md) now connects extraction,
-loading and catalog dbt, verified once and left paused. Future image changes still
+The [Airflow catalog workflow](catalog-workflow.md) connects extraction,
+loading and catalog dbt. It is now recurring, with the
+[catalog dashboard extension](catalog-dashboard.md). Future image changes still
 require saved-plan review, verified landing/warehouse backups and draining affected
 writers. Recurring activation and change streams are separate decisions; CDC
 requires a reviewed replica-set milestone.

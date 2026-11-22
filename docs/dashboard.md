@@ -1,8 +1,10 @@
-# Streamlit sales dashboard
+# Streamlit retail dashboard
 
 Status: deployed locally on 2026-11-19 from CI-verified commit `64a1a1e` through
 an owner-approved saved Terraform plan. Open <http://127.0.0.1:8501> locally.
-The first milestone covers sales. Inventory and shipment pages are future work.
+The sales foundation was extended on 2026-11-22 with deployed
+[catalog/category sales and inventory movement views](catalog-dashboard.md).
+Shipment reporting remains future work.
 
 ```mermaid
 flowchart LR
@@ -41,7 +43,9 @@ same reentrant FileLock for the entire build/test/publication operation. Other
 writers cannot change the tested data between those steps. Existing default
 builds, customer builds and event analytics do not publish sales snapshots.
 
-Python creates a separate DuckDB file containing **only the sales aggregate**.
+For the sales overview, Python creates a separate DuckDB file containing **only
+the sales aggregate**. Catalog views use their own separately verified pointer
+and three allowlisted tables described in the extension runbook.
 It checks its schema, row contract, keys and closed bytes, writes checksum metadata
 last, then atomically replaces `current.json` after publishing the new immutable
 version directory. The dashboard validates the version path, manifest, checksum,

@@ -26,6 +26,9 @@ def scheduled_build(
         not (customers or parallel or catalog)
         and os.environ.get("RETAILFLOW_DASHBOARD_ENABLED", "false") == "true"
     )
+    catalog_reporting = (
+        catalog and os.environ.get("RETAILFLOW_DASHBOARD_ENABLED", "false") == "true"
+    )
     identity = hashlib.sha256(json.dumps([dag_id, run_id, try_number]).encode()).hexdigest()
     directory = (
         Path(os.environ.get("RETAILFLOW_DBT_ARTIFACT_DIR", "/opt/airflow/logs/dbt"))
@@ -61,14 +64,16 @@ def scheduled_build(
             "RETAILFLOW_EVENT_INTERVAL_SECONDS", "600"
         ),
     }
-    if reporting:
+    if reporting or catalog_reporting:
         environment["RETAILFLOW_REPORTING_DIR"] = os.environ["RETAILFLOW_REPORTING_DIR"]
     subprocess.run(  # nosec B603
         [
             "/opt/dbt/venv/bin/python",
             "-I",
             "/opt/dbt/run.py",
-            "catalog-pipeline"
+            "catalog-reporting-pipeline"
+            if catalog_reporting
+            else "catalog-pipeline"
             if catalog
             else "parallel-pipeline"
             if parallel
@@ -96,13 +101,23 @@ def scheduled_build(
         if len(paths) != 1:
             raise RuntimeError("Missing dbt freshness evidence")
         checks = json.loads(paths[0].read_text(encoding="utf-8"))["results"]
-        expected = 1 if catalog or ((customers or parallel) and phase == "freshness_tests") else 2
+        expected = (
+            4
+            if catalog_reporting
+            else 1
+            if catalog or ((customers or parallel) and phase == "freshness_tests")
+            else 2
+        )
         if len(checks) != expected or any(row["status"] != "pass" for row in checks):
             raise RuntimeError("dbt freshness checks did not all pass")
     return {
         "artifact_directory": str(directory),
         "models_succeeded": sum(row["unique_id"].startswith("model.") for row in records),
         "tests_passed": sum(row["unique_id"].startswith("test.") for row in records),
-        "freshness_sources_passed": 1 if catalog else 2,
-        "freshness_tests_passed": 1 if customers or parallel or catalog else 2,
+        "freshness_sources_passed": 4 if catalog_reporting else 1 if catalog else 2,
+        "freshness_tests_passed": 4
+        if catalog_reporting
+        else 1
+        if customers or parallel or catalog
+        else 2,
     }
