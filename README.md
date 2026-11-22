@@ -177,9 +177,11 @@ Shipment reporting and replica-set change streams remain future milestones.
 in Streamlit. It selects read-only tools over verified snapshots, calculates exact
 amounts deterministically and shows evidence, FX gaps and limitations. Offline mock
 mode needs no account; local Ollama uses the same restricted tools. Hosted/paid
-providers are prohibited by configuration and runtime. The chat is active in free
-mock/demo mode at `http://localhost:8501`; select **AI business analyst**. A real
-local model is not running yet. See [setup, evaluation and security](docs/agentic-ai.md).
+providers are prohibited by configuration and runtime. The chat runs the real local
+**Ollama · qwen3:1.7b** model with cloud features disabled at
+<http://localhost:8501>; select **AI business analyst**. CPU answers can take tens
+of seconds. See [local model operation and verification](docs/ollama.md) and
+[setup, evaluation and security](docs/agentic-ai.md).
 Read-only operational investigation is designed as a separate next milestone.
 Optional Azure/Snowflake targets remain future possibilities; the current platform
 is a local engineering project, not a production cloud deployment.

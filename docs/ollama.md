@@ -103,3 +103,40 @@ only after those operations actually complete.
 Model weights are reproducible public artifacts, separate from business-data
 backups. Keep their pinned digest and seed receipt; do not auto-delete the protected
 volume. Existing blob/warehouse/report backup and retention rules are unchanged.
+
+## Local activation record
+
+Activated on 2026-11-22 from `feature/agentic-ai` commit
+`ad6f16ada7f25c589c64e4a54f6efa63d024ae0c`, after
+[successful full CI](https://github.com/ungvari-tomi/tomi-platform/actions/runs/45053608401)
+and owner-authorized saved-plan deployment. The review verified 258 source files,
+5,918 backed-up landed blobs and a locked warehouse backup with 14 base tables.
+The scoped plan created six model resources and replaced five supporting AI/UI
+resources; existing ingestion resources and protected source volumes were preserved.
+Both affected reporting DAGs were restored to their original enabled states.
+
+The optional real-model pytest passed: **1 test, four semantic cases**, in 195.18
+seconds. It checked market ranking, product ordering frequency, EUR coverage and
+a Hungary-only follow-up, including exact counts and NULL valuation gaps. Measured
+case latencies were 97.5, 23.6, 20.2 and 33.0 seconds. These are authored synthetic
+cases, not a general reliability score.
+
+Live Streamlit checks passed for a real-model question, scoped follow-up, evidence,
+both existing report pages and preserved immutable snapshot checksums. The first
+live answer took 81.1 seconds. Verification confirmed non-root execution, read-only
+model/report mounts, internal networking, no published model/analyst ports,
+`OLLAMA_NO_CLOUD=1` and the 3 GiB/two-CPU serving limit.
+
+Docker CPU strings were subsequently normalized in `3e5eef7`, with
+[successful CI](https://github.com/ungvari-tomi/tomi-platform/actions/runs/45056648363).
+The refreshed Terraform plan reported no changes; no further changing apply was
+needed. Disposable evaluation storage was removed; protected model storage remains.
+Private evidence is retained under ignored `artifacts/ollama-model-activation/`
+and `artifacts/ai-evaluation/`.
+
+Open <http://localhost:8501>, refresh and select **AI business analyst**. The page
+shows provider `ollama` and model `qwen3:1.7b`. Select the appropriate snapshot and
+date range before asking. Use supported English country names or uppercase ISO
+codes, and exact product/warehouse IDs when filtering. Generation schemas constrain
+filters to entities mentioned in the question or user history; the model still
+chooses the tools. Verify scope and evidence, especially after follow-ups.

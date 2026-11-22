@@ -7,8 +7,9 @@ with Terraform-managed internal-only serving; activation is recorded separately.
 Branch: `feature/agentic-ai`. The required CI gate completed successfully for
 `05f588dceb8319eff9170bdea3aaa3442e5b0f55` in run 45015922921; fetching main
 confirmed the same HEAD before branch creation. Existing local containers were
-observed running during assessment. The free mock analyst was subsequently deployed
-with owner approval; the activation evidence is recorded below. Existing schedules
+observed running during assessment. The initial mock analyst was subsequently
+replaced by verified local Ollama with owner approval; see the
+[current activation record](ollama.md#local-activation-record). Existing schedules
 were restored to their exact previous states.
 
 ## Assessment and architecture decision
@@ -62,11 +63,13 @@ select any registered tool, inspect evidence and select another tool before
 answering. The mock is a deterministic test double, not an LLM. Financial prose
 is rendered from deterministic results: the model selects evidence and its order,
 but cannot insert invented totals. This intentionally limits narrative flexibility.
-Each turn allows six tools, 45 seconds overall and ten seconds per tool. Thread
+Each turn allows six tools and ten seconds per tool. Mock allows 45 seconds overall;
+local Ollama allows 180 seconds overall and 60 seconds per model decision. Thread
 timeouts bound the response; running read-only work finishes cooperatively.
 
-Ollama uses its [JSON chat API](https://docs.ollama.com/api/chat). It has not
-been exercised against a real model in this milestone; protocol tests use mock HTTP.
+Ollama uses its [JSON chat API](https://docs.ollama.com/api/chat). Initial protocol
+tests used mock HTTP; subsequent real-model and live UI checks are recorded in
+the [local model guide](ollama.md#local-activation-record).
 An initial hosted adapter was removed when the owner required free-only operation.
 Runtime and Terraform both reject hosted providers; no model key mounts exist.
 Offline phase A/B validation: 24 focused tests passed. No service was deployed.
@@ -81,10 +84,10 @@ the AI page; existing sales/catalog pages keep working.
 Terraform adds an opt-in `analyst_enabled` component with an internal bridge, no
 published port, non-root UID/GID 10001, read-only root/reporting volume, dropped
 capabilities, 512 MiB memory and 0.5 CPU. Mock mode has no egress network. Ollama
-adds a model-access bridge. Fixed adapter
-endpoints, disabled proxies and redirects limit application requests; this bridge
-is not a destination-level firewall. A compromised process would have broader
-network access. No model credentials are accepted or mounted.
+adds an internal model-access network without internet egress or published ports.
+Only its exited one-shot seeder has a download bridge. Fixed adapter endpoints,
+disabled proxies and redirects further limit application requests. No model
+credentials are accepted or mounted.
 
 No authentication is claimed for the private service or existing loopback UI.
 Keep both local; external/multi-user access requires a separate design. The AI
@@ -172,7 +175,9 @@ uv run --locked python -m pytest -q -p no:cacheprovider tests/test_ai_container.
 Remove-Item Env:RETAILFLOW_TEST_ANALYST_IMAGE
 ```
 
-The managed local dashboard now runs the free mock chat. For new installations,
+The managed dashboard now runs local Ollama. The following is the optional offline
+mock configuration; for the deployed model use the [Ollama settings](ollama.md).
+For new installations,
 after feature-branch CI/release review, enable these settings in ignored local `.env`
 or process environment; preserve every currently enabled platform feature:
 
@@ -194,20 +199,16 @@ configuration/process health, not a model-ready or data-freshness guarantee.
 
 ### Local LLM
 
-Choose an already installed Ollama model that can produce the supplied decision
-JSON schema (`ollama list`). Set `RETAILFLOW_AI_PROVIDER=ollama` and
-`RETAILFLOW_AI_MODEL=<installed-model-name>` before a reviewed deployment. No model
-is downloaded or started by Terraform. The container uses the fixed Docker Desktop
-host endpoint `http://host.docker.internal:11434/api/chat`. Ollama must accept that
-Docker-local connection; avoid exposing its unauthenticated API on a public interface.
-Linux host routing/firewall configuration requires separate local verification.
+Terraform now manages the pinned `qwen3:1.7b` model, one-shot verified download and
+internal-only serving at `http://retailflow-ollama:11434/api/chat`. No host Ollama
+installation is needed. Follow the [local model guide](ollama.md) for settings,
+resource limits, protected storage and actual evaluation/deployment results.
 
-Local generation uses CPU/GPU/RAM/disk and electricity; a model may exceed the
-15-second decision or 45-second turn budget on this machine. Select a suitable
-model separately. Never increase budgets silently or fall back to a paid provider.
-Protocol/schema support is tested with mock HTTP; real model generation has not
-been verified. Mock mode supports a limited English vocabulary; it is visibly a
-demo planner. Local model selection is dynamic, with the same capability boundary.
+Local generation consumes CPU/RAM/disk and electricity. The reviewed CPU budget
+is 60 seconds per decision and 180 seconds per turn; observed answers took about
+20-100 seconds. Timeouts fail visibly with no paid or mock fallback. Mock remains
+a limited-vocabulary offline test double. Actual local model tool selection is
+dynamic, with the same read-only capability boundary.
 
 ### Free-only policy
 
@@ -219,7 +220,8 @@ the operator must disable its cloud features with `OLLAMA_NO_CLOUD=1` on the
 Ollama server and verify an installed local model. See the
 [official Ollama cloud-disable instructions](https://github.com/ollama/ollama/blob/main/docs/faq.mdx).
 Model-name checks alone do not prove that a separately operated server cannot
-route a custom alias remotely. The initial mock deployment has no egress bridge.
+route a custom alias remotely. Managed serving also has no internet route; only
+the one-shot model seeder has a download bridge.
 
 ## Evaluation and CI
 
@@ -259,8 +261,9 @@ is correct. Review the displayed scope and evidence before using conclusions.
 
 Report checksum validation detects corruption, not malicious replacement by an
 authorized publisher. Reporting storage is read-only to the analyst but contains
-multiple historical snapshots; there is no per-dataset RBAC. A compromised optional
-model-connected container has outbound network access on its model bridge. No
+multiple historical snapshots; there is no per-dataset RBAC. The analyst and
+model server use internal networks without internet egress; the download seeder
+is a separate exited process. Docker host administration remains trusted. No
 Enterprise auditing, legal compliance or production authentication is claimed.
 
 Chat/session evidence is bounded to six messages and lost when the session ends;
@@ -369,9 +372,13 @@ snapshot hashes and read-only/non-root/private-network boundaries. Streamlit's
 loopback health URL returned HTTP 200. Both report publishers were restored to
 their original enabled states; the customer and other DAG states were unchanged.
 
-Open **http://localhost:8501**, refresh, and select **AI business analyst**. The
-provider is explicitly **mock**: a free deterministic demo planner, not a running
-LLM. There is no model-access egress bridge, model key mount or published analyst
+At this initial activation, the provider was explicitly **mock**: a free
+deterministic demo planner, not a running
+LLM. There was no model-access egress bridge, model key mount or published analyst
 port. No model was downloaded, and no cloud or paid service was activated.
 Private backups, saved plans, CI and verification evidence remain under ignored
 `artifacts/agentic-ai-deployment/` and `artifacts/release-reviews/`.
+
+This initial activation was superseded by the real local Ollama deployment.
+See the [current activation record](ollama.md#local-activation-record), including
+real-model scope checks and live Streamlit verification.
