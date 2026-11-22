@@ -3,8 +3,9 @@
 Branch: `feature/agentic-ai`. The required CI gate completed successfully for
 `05f588dceb8319eff9170bdea3aaa3442e5b0f55` in run 45015922921; fetching main
 confirmed the same HEAD before branch creation. Existing local containers were
-observed running during assessment. No AI runtime is deployed and active schedules
-are not changed by this work.
+observed running during assessment. The free mock analyst was subsequently deployed
+with owner approval; the activation evidence is recorded below. Existing schedules
+were restored to their exact previous states.
 
 ## Assessment and architecture decision
 
@@ -167,8 +168,8 @@ uv run --locked python -m pytest -q -p no:cacheprovider tests/test_ai_container.
 Remove-Item Env:RETAILFLOW_TEST_ANALYST_IMAGE
 ```
 
-For the managed dashboard, configuration is prepared but **not deployed**. After
-feature-branch CI/release review, enable these settings in ignored local `.env`
+The managed local dashboard now runs the free mock chat. For new installations,
+after feature-branch CI/release review, enable these settings in ignored local `.env`
 or process environment; preserve every currently enabled platform feature:
 
 ```dotenv
@@ -334,9 +335,39 @@ test failures. Test containers, anonymous volumes and internal networks were rem
 The local Ollama API probe timed out. No model was started/downloaded, no hosted
 request was made and no model credentials were created. Provider protocol tests
 include a complete multi-step JSON-adapter/tool/evidence loop using mock HTTP.
-Feature CI still needs a remote run after an explicitly authorized push. No
-Terraform plan/apply, live schedule change or AI deployment was performed.
+Those initial checks preceded deployment. The subsequent owner-approved activation
+is recorded below; no hosted model or paid resource was enabled.
 
 The platform showcases capabilities at small local scale; no chargeable resources
 or subscription configuration may be enabled. Local RAM/disk usage still requires
 review before introducing a real model.
+
+## Local activation — 2026-11-22
+
+Owner-approved source commit: `5b0b20e1dee36289e4cb8237296fd5eb75ffb15e`, pushed to
+`feature/agentic-ai`; main was not merged or changed. Its
+[CI run 45045214576](https://github.com/ungvari-tomi/tomi-platform/actions/runs/45045214576)
+passed all five jobs. Free-only policy changes also passed 48 focused local tests,
+including runtime rejection of hosted providers and actual Terraform variable validation.
+
+The local source package was verified byte-for-byte against all 251 committed
+source files. A reviewed saved plan created only the private analyst network,
+image and container, and replaced the dashboard image/container and reporting
+permissions initializer. No protected volumes or ingestion resources changed.
+Before apply, 5,844 landed blobs were backed up and checksum-verified; the two
+report publishers were paused/drained and an independently restored warehouse
+backup verified all 14 base-table inventories. The saved plan applied successfully
+and blob checksums were verified again. A post-deployment plan reported no changes.
+
+Live verification passed: a country-performance chat question, Hungary follow-up,
+snapshot evidence/warnings, both existing report pages, unchanged sales/catalog
+snapshot hashes and read-only/non-root/private-network boundaries. Streamlit's
+loopback health URL returned HTTP 200. Both report publishers were restored to
+their original enabled states; the customer and other DAG states were unchanged.
+
+Open **http://localhost:8501**, refresh, and select **AI business analyst**. The
+provider is explicitly **mock**: a free deterministic demo planner, not a running
+LLM. There is no model-access egress bridge, model key mount or published analyst
+port. No model was downloaded, and no cloud or paid service was activated.
+Private backups, saved plans, CI and verification evidence remain under ignored
+`artifacts/agentic-ai-deployment/` and `artifacts/release-reviews/`.
