@@ -44,7 +44,11 @@ class MockProvider:
             if "summary" in q and "weekly" in q and len(results) < 3:
                 tool = ["sales_summary", "country_performance", "fx_coverage"][len(results)]
             else:
-                return Decision(kind="answer", evidence_ids=list(results), presentation="brief")
+                return Decision(
+                    kind="answer",
+                    evidence_ids=list(results),
+                    presentation="management_summary" if "weekly" in q else "brief",
+                )
         elif re.search(r"product-\d{3}", q) and ("lookup" in q or "look up" in q):
             return Decision(
                 kind="tool",

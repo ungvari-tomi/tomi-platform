@@ -100,6 +100,25 @@ def test_bad_arguments_budget_and_provider_failure_are_safe(tools):
     assert Agent(Scripted()).run(question(), tools.reports).status == "unavailable"
 
 
+def test_tool_output_manipulation_fails_closed(tools, monkeypatch):
+    from retailflow_ai.tools import Tools
+
+    original = tools.call(
+        "sales_summary",
+        {
+            "source": "catalog",
+            "dataset_id": "profile-a",
+            "start_date": "2026-11-19",
+            "end_date": "2026-11-19",
+        },
+    )
+    bad = original.model_copy(update={"facts": {**original.facts, "orders": 3.5}})
+    monkeypatch.setattr(Tools, "call", lambda *args: bad)
+    result = Agent(MockProvider()).run(question("Sales summary"), tools.reports)
+    assert result.status == "unavailable" and not result.evidence
+    assert "3.5" not in result.text
+
+
 def test_read_only_tool_timeout_returns_without_waiting_for_background_work(tools, monkeypatch):
     from retailflow_ai.tools import Tools
 
@@ -162,3 +181,33 @@ def test_hosted_is_double_opt_in_and_key_never_enters_model_payload(tmp_path):
         "openai", "test", key_file=key, allow_hosted=True, transport=httpx.MockTransport(handler)
     )
     assert provider.decide({}, [], 1).kind == "abstain"
+
+
+def test_json_model_adapter_runs_a_genuine_multistep_tool_loop(tools):
+    """The adapter follows model-selected tools/results, not a hardwired sequence."""
+
+    def handler(request):
+        body = json.loads(request.content)
+        state = json.loads(body["messages"][1]["content"])["state"]
+        if not state["results"]:
+            decision = {
+                "kind": "tool",
+                "tool": "catalog_lookup",
+                "arguments": {"product_id": "product-002"},
+            }
+        elif len(state["results"]) == 1:
+            assert state["results"]["e1"]["facts"]["sku"] == "RF-0002"
+            decision = {
+                "kind": "tool",
+                "tool": "inventory_movements",
+                "arguments": {"seed": 42, "interval_seconds": 600},
+            }
+        else:
+            decision = {"kind": "answer", "evidence_ids": ["e2", "e1"]}
+        return httpx.Response(200, json={"message": {"content": json.dumps(decision)}})
+
+    provider = JsonProvider("ollama", "fixture-model", transport=httpx.MockTransport(handler))
+    result = Agent(provider).run(question("Investigate products and movements"), tools.reports)
+    assert result.status == "answered"
+    assert [t.tool for t in result.trace] == ["catalog_lookup", "inventory_movements"]
+    assert result.text.startswith("[e2]") and "[e1]" in result.text

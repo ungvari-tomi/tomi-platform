@@ -227,3 +227,31 @@ def test_dashboard_resources_are_local_and_existing_storage_stays_protected():
                     ]
                 }
             )
+
+
+def test_analyst_plan_accepts_scoped_resources_but_rejects_network_deletion():
+    for address in (
+        "docker_network.analyst[0]",
+        "docker_network.analyst_model[0]",
+        "docker_image.analyst[0]",
+        "docker_container.analyst[0]",
+    ):
+        result = infrastructure.plan_summary(
+            {
+                "resource_changes": [
+                    {"address": address, "change": {"actions": ["create"]}},
+                ]
+            }
+        )
+        assert result["creates"] == [address]
+    with pytest.raises(ValueError, match="deletes data storage or networking"):
+        infrastructure.plan_summary(
+            {
+                "resource_changes": [
+                    {
+                        "address": "docker_network.analyst[0]",
+                        "change": {"actions": ["delete", "create"]},
+                    },
+                ]
+            }
+        )

@@ -130,3 +130,10 @@ refresh and richer BI navigation remain future milestones.
 
 References: [Streamlit Docker deployment](https://docs.streamlit.io/deploy/tutorials/docker),
 [Streamlit AppTest](https://docs.streamlit.io/develop/api-reference/app-testing).
+## Optional AI page
+
+The snapshot-only business analyst is prepared on `feature/agentic-ai`, disabled
+by default and not deployed. It uses a separate private service; missing AI/model
+services do not prevent sales or catalog pages from working. See the
+[AI runbook](agentic-ai.md) for provider choices, evidence, costs, tests and the
+owner-approved deployment boundary.

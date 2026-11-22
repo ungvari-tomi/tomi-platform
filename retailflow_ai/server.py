@@ -106,7 +106,10 @@ def main():
             key_file=Path("/run/secrets/model-key") if kind == "openai" else None,
             allow_hosted=os.environ.get("RETAILFLOW_AI_ALLOW_HOSTED") == "true",
         )
-    server = AnalystServer(("0.0.0.0", 8090), Agent(provider), Path("/reports"))  # nosec B104
+    bind = os.environ.get("RETAILFLOW_AI_BIND", "127.0.0.1")
+    if bind not in {"127.0.0.1", "0.0.0.0"}:  # nosec B104
+        raise ValueError("Invalid analyst bind address")
+    server = AnalystServer((bind, 8090), Agent(provider), Path("/reports"))
     try:
         server.serve_forever()
     finally:

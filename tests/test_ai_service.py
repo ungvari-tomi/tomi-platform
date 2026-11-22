@@ -72,6 +72,14 @@ def test_http_rejects_paths_oversize_unknown_fields_and_busy(tools):
             ("/.env", None, 404),
             ("/chat", {"question": "x", "root": "/private"}, 400),
             ("/chat", {"question": "x" * 40_000}, 400),
+            (
+                "/chat",
+                {
+                    "question": "Sales",
+                    "context": {"start_date": "2026-11-20", "end_date": "2026-11-19"},
+                },
+                400,
+            ),
         ]:
             with pytest.raises(HTTPError) as error:
                 call(server, path, value)

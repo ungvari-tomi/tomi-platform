@@ -13,6 +13,18 @@ def test_documentation_only_skips_runtime_jobs():
 
 
 @pytest.mark.parametrize(
+    "path", ["retailflow_ai/agent.py", "infra/analyst/uv.lock", "infra/local/analyst.tf"]
+)
+def test_analyst_changes_select_offline_and_disposable_integration(path):
+    selected = ci_select.select([path])
+    assert selected["checks"] and selected["integration"]
+    assert "tests/test_ai_container.py" in selected["tests"]
+    assert "tests/test_ai_evaluation.py" in selected["tests"]
+    assert selected["dependencies"] == path.endswith("uv.lock")
+    assert selected["terraform"] == path.endswith(".tf")
+
+
+@pytest.mark.parametrize(
     "path",
     [
         "infra/dbt/catalog_reporting.py",
@@ -29,6 +41,11 @@ def test_catalog_dashboard_changes_include_publication_and_ui_tests(path):
         "tests/test_dashboard_container.py",
         "tests/test_catalog_dashboard_container.py",
         "tests/test_transformation.py",
+        "tests/test_ai_tools.py",
+        "tests/test_ai_agent.py",
+        "tests/test_ai_service.py",
+        "tests/test_ai_evaluation.py",
+        "tests/test_ai_container.py",
     }
 
 

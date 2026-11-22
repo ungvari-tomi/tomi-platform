@@ -1,7 +1,7 @@
 """Optional analyst UI and fixed private endpoint client; no model credentials."""
 
 import json
-from datetime import date
+from datetime import date, timedelta
 from urllib.error import HTTPError, URLError
 from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 
@@ -58,15 +58,17 @@ def render():
         if profiles:
             dataset = st.selectbox("Analysis sales dataset", [p["dataset_id"] for p in profiles])
             profile = next(p for p in profiles if p["dataset_id"] == dataset)
+            first = date.fromisoformat(profile["first_date"])
+            last = date.fromisoformat(profile["last_date"])
             dates = st.date_input(
                 "Analysis dates (UTC)",
-                (
-                    date.fromisoformat(profile["first_date"]),
-                    date.fromisoformat(profile["last_date"]),
-                ),
+                (max(first, last - timedelta(days=6)), last),
             )
             if len(dates) != 2:
                 st.info("Select both dates before asking a sales question.")
+                return
+            if dates[1] < dates[0] or (dates[1] - dates[0]).days > 365:
+                st.info("Choose an ordered period of at most 366 days.")
                 return
             context.update(
                 dataset_id=dataset, start_date=dates[0].isoformat(), end_date=dates[1].isoformat()

@@ -226,3 +226,13 @@ and no Terraform drift. Both schedules are enabled. No cloud resources were
 provisioned. Deployment evidence is retained in ignored
 `artifacts/deployment-fc998f9/deployment.json`. These documentation updates do not
 change runtime image inputs.
+## Analyst extension checks
+
+`retailflow_ai/` and `infra/analyst/` changes select focused offline analyst tests
+and a disposable private service/Streamlit test. Reporting reader/dashboard changes
+also include analyst regressions. Ruff and Bandit include the new package; runtime
+dependency auditing includes the independent analyst lock. The integration job
+builds its validation image and opts in with `RETAILFLOW_TEST_ANALYST_IMAGE=1`.
+Mandatory CI uses mock providers and needs no LLM service, hosted account or key.
+The feature branch can run CI without merging; delivery remains main-only, manually
+triggered and fully validated. See [evaluation scope](agentic-ai.md).

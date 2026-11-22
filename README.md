@@ -169,9 +169,16 @@ Streamlit dashboard, with country/product/date filters, exact EUR revenue and
 explicit missing-rate coverage. It reads independent verified aggregate snapshots.
 This milestone is deployed locally. See the [dashboard guide](docs/dashboard.md).
 
-**Future:** inventory and shipment dashboard pages and richer reporting navigation.
-The product catalog roadmap adds verified JSON extraction and dbt enrichment;
-replica-set change streams remain a separate advanced milestone.
+**Implemented:** catalog/inventory reporting with latest product metadata and
+separate inventory movement profiles. See [catalog reporting](docs/catalog-dashboard.md).
+Shipment reporting and replica-set change streams remain future milestones.
+
+**Prepared on `feature/agentic-ai`, not deployed:** an opt-in AI business analyst
+in Streamlit. It selects read-only tools over verified snapshots, calculates exact
+amounts deterministically and shows evidence, FX gaps and limitations. Offline mock
+mode needs no account; local Ollama and explicitly opted-in hosted adapters share
+the same restricted tools. See [setup, evaluation and security](docs/agentic-ai.md).
+Read-only operational investigation is designed as a separate next milestone.
 Optional Azure/Snowflake targets remain future possibilities; the current platform
 is a local engineering project, not a production cloud deployment.
 

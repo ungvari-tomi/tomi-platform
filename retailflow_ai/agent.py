@@ -110,7 +110,12 @@ def render(result: ToolResult) -> str:
             text += " These aggregates cannot distinguish missing, stale or unsupported FX."
         return text
     if result.tool.endswith("performance"):
-        lines = [f"Ranked by {facts['ranked_by']} (covered revenue may be partial):"]
+        metric = {
+            "orders": "observed order count",
+            "units": "units sold",
+            "covered_revenue_eur_minor": "covered EUR revenue",
+        }[facts["ranked_by"]]
+        lines = [f"Ranked by {metric} (covered revenue may be partial):"]
         lines += [f"{r['key']}: {metric_text(r)}" for r in facts["groups"]]
         return "\n".join(lines)
     if result.tool == "period_comparison":
@@ -125,11 +130,18 @@ def render(result: ToolResult) -> str:
             f"Revenue change: {euro(facts['revenue_delta_eur_minor'])}."
         )
     if result.tool == "inventory_movements":
-        return (
+        text = (
             f"{facts['movement_count']:,} observed movement events: "
             f"{facts['inbound_units']:,} inbound and {facts['outbound_units']:,} outbound units; "
             f"net movement {facts['net_quantity_moved']:,} units. "
             "This is lifetime movement, without an opening balance or dated anomaly evidence."
+        )
+        ranks = "\n".join(
+            f"{r['product_id']} / {r['warehouse_id']}: net {r['net_quantity_moved']:,} units"
+            for r in facts["largest_absolute_net_movements"]
+        )
+        return text + (
+            "\nLargest absolute movements (not proven anomalies):\n" + ranks if ranks else ""
         )
     if result.tool == "catalog_lookup":
         return (
@@ -225,6 +237,8 @@ class Agent:
                             "No valid evidence was selected; no conclusion is supported.",
                         )
                     text = "\n\n".join(f"[{i}] {render(evidence[i])}" for i in ids)
+                    if decision.presentation == "management_summary":
+                        text = "Management summary for the selected observed period:\n\n" + text
                     warnings = sorted(
                         {w for i in ids for w in evidence[i].warnings + evidence[i].limitations}
                     )
@@ -279,6 +293,8 @@ class Agent:
                     result = future.result(timeout=min(self.tool_seconds, remaining))
                     # Validate the final result rather than trusting arbitrary tool-return objects.
                     result = ToolResult.model_validate(result.model_dump())
+                    if result.tool != name:
+                        raise DataUnavailable("tool_result_mismatch")
                     evidence[call_id] = result
                     state["results"][call_id] = result.model_dump(mode="json")
                     trace.append(

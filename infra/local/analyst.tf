@@ -29,6 +29,11 @@ variable "analyst_key_file" {
   description = "Ignored private hosted-provider key path only; contents never enter Terraform."
 }
 
+locals {
+  analyst_key_path         = replace(abspath(var.analyst_key_file), "\\", "/")
+  analyst_key_mount_source = can(regex("^[A-Za-z]:/", local.analyst_key_path)) ? "/run/desktop/mnt/host/${lower(substr(local.analyst_key_path, 0, 1))}/${substr(local.analyst_key_path, 3, length(local.analyst_key_path) - 3)}" : local.analyst_key_path
+}
+
 resource "docker_network" "analyst" {
   count    = var.analyst_enabled ? 1 : 0
   name     = "retailflow-analyst-private"
@@ -93,7 +98,7 @@ resource "docker_container" "analyst" {
     for_each = var.analyst_provider == "openai" ? [var.analyst_key_file] : []
     content {
       target    = "/run/secrets/model-key"
-      source    = replace(abspath(mounts.value), "\\", "/")
+      source    = local.analyst_key_mount_source
       type      = "bind"
       read_only = true
     }

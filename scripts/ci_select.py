@@ -27,6 +27,28 @@ def select(paths: list[str], *, full: bool = False) -> dict:
     for path in paths:
         if path == "AGENTS.md" or path == "README.md" or path.startswith("docs/"):
             continue
+        if path.startswith(("retailflow_ai/", "infra/analyst/")) or path in {
+            "infra/dashboard/analyst_page.py",
+            "infra/local/analyst.tf",
+            "infra/local/dashboard.tf",
+        }:
+            flags["checks"] = flags["integration"] = True
+            flags["terraform"] |= path.endswith(".tf")
+            flags["dependencies"] |= path.endswith(
+                ("uv.lock", "pyproject.toml", "requirements.txt")
+            )
+            targets.update(
+                {
+                    "tests/test_ai_tools.py",
+                    "tests/test_ai_agent.py",
+                    "tests/test_ai_service.py",
+                    "tests/test_ai_container.py",
+                    "tests/test_ai_evaluation.py",
+                }
+            )
+            if path.endswith(".tf"):
+                targets.update({"tests/test_infrastructure.py", "tests/test_image_inputs.py"})
+            continue
         if path.startswith("infra/dashboard/") or path in {
             "infra/dbt/catalog_reporting.py",
             "infra/dbt/reporting.py",
@@ -43,6 +65,11 @@ def select(paths: list[str], *, full: bool = False) -> dict:
                     "tests/test_dashboard_container.py",
                     "tests/test_catalog_dashboard_container.py",
                     "tests/test_transformation.py",
+                    "tests/test_ai_tools.py",
+                    "tests/test_ai_agent.py",
+                    "tests/test_ai_service.py",
+                    "tests/test_ai_evaluation.py",
+                    "tests/test_ai_container.py",
                 }
             )
             continue
@@ -115,6 +142,7 @@ def select(paths: list[str], *, full: bool = False) -> dict:
                     "RETAILFLOW_TEST_PARALLEL_IMAGES",
                     "RETAILFLOW_TEST_DASHBOARD_IMAGE",
                     "RETAILFLOW_TEST_MONGODB_IMAGE",
+                    "RETAILFLOW_TEST_ANALYST_IMAGE",
                 )
             ):
                 flags["integration"] = True
